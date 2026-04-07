@@ -1,60 +1,55 @@
 #!/bin/bash
-set -e
 
 echo "=== Cadomotus SEO Agent ==="
 echo "Mode: ${MODE:-watch}"
+echo "Token path: ${GOOGLE_TOKEN_PATH:-/data/token.json}"
 
-# Check of Google token bestaat
-if [ ! -f /data/token.json ]; then
-    echo "WAARSCHUWING: Geen Google token gevonden op /data/token.json"
-    echo "Voer eerst de auth flow uit: docker exec <container> python agent.py --auth"
-fi
+# Zorg dat /data directory bestaat
+mkdir -p /data
 
 case "${MODE}" in
     report)
         echo "Eenmalig rapport genereren..."
-        python agent.py --weekly-report
+        exec python agent.py --weekly-report
         ;;
     auth)
         echo "Google OAuth2 authenticatie..."
-        python agent.py --auth
+        exec python agent.py --auth
         ;;
     watch)
         echo "Reply watcher starten..."
-        python agent.py --watch-replies
+        exec python agent.py --watch-replies
         ;;
     full)
         echo "Reply watcher + cron starten..."
+
         # Start de reply watcher op de achtergrond
         python agent.py --watch-replies &
         WATCHER_PID=$!
 
-        # Start een simpele cron loop voor het wekelijkse rapport
+        # Start de cron scheduler op de achtergrond
         python -c "
-import schedule, time, subprocess, os
+import schedule, time, subprocess
 
 def run_report():
-    print('=== Cron: wekelijks rapport starten ===')
+    print('=== Cron: wekelijks rapport starten ===', flush=True)
     subprocess.run(['python', 'agent.py', '--weekly-report'])
 
-# Parse REPORT_CRON env var (standaard: vrijdag 07:00)
-# Simpele implementatie: elke vrijdag om 07:00
 schedule.every().friday.at('07:00').do(run_report)
+print('Cron gestart: wekelijks rapport elke vrijdag 07:00', flush=True)
 
-print(f'Cron gestart: wekelijks rapport elke vrijdag 07:00')
 while True:
     schedule.run_pending()
     time.sleep(60)
 " &
         CRON_PID=$!
 
-        # Wacht op beide processen
-        trap "kill $WATCHER_PID $CRON_PID 2>/dev/null" EXIT
-        wait -n $WATCHER_PID $CRON_PID
+        # Wacht op beide processen — herstart niet bij crash
+        trap "kill $WATCHER_PID $CRON_PID 2>/dev/null" EXIT TERM INT
+        wait $WATCHER_PID $CRON_PID
         ;;
     *)
-        echo "Onbekende mode: ${MODE}"
-        echo "Gebruik: MODE=watch|report|auth|full"
-        exit 1
+        echo "Onbekende mode: ${MODE}. Standaard: watch mode."
+        exec python agent.py --watch-replies
         ;;
 esac
