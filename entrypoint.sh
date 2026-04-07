@@ -7,14 +7,21 @@ echo "Token path: ${GOOGLE_TOKEN_PATH:-/data/token.json}"
 # Zorg dat /data directory bestaat
 mkdir -p /data
 
+# Start health check server (Easypanel vereist een open poort)
+python healthcheck.py &
+HEALTH_PID=$!
+
 case "${MODE}" in
     report)
         echo "Eenmalig rapport genereren..."
-        exec python agent.py --weekly-report
+        python agent.py --weekly-report
         ;;
     auth)
         echo "Google OAuth2 authenticatie..."
-        exec python agent.py --auth
+        python agent.py --auth
+        # Blijf draaien na auth zodat container niet stopt
+        echo "Auth voltooid. Container blijft draaien voor health check."
+        wait $HEALTH_PID
         ;;
     watch)
         echo "Reply watcher starten..."
@@ -44,12 +51,13 @@ while True:
 " &
         CRON_PID=$!
 
-        # Wacht op beide processen — herstart niet bij crash
-        trap "kill $WATCHER_PID $CRON_PID 2>/dev/null" EXIT TERM INT
+        # Wacht op alle processen
+        trap "kill $WATCHER_PID $CRON_PID $HEALTH_PID 2>/dev/null" EXIT TERM INT
         wait $WATCHER_PID $CRON_PID
         ;;
     *)
         echo "Onbekende mode: ${MODE}. Standaard: watch mode."
-        exec python agent.py --watch-replies
+        python agent.py --watch-replies &
+        wait $!
         ;;
 esac
