@@ -1,143 +1,69 @@
-"""Cadomotus SEO Agent — single entrypoint voor Docker.
+"""Cadomotus SEO Agent — Docker entrypoint."""
 
-Start health check server + reply watcher + cron scheduler.
-"""
-
-import os
 import sys
+import os
 import time
 import threading
-import subprocess
-from datetime import datetime
-from pathlib import Path
+import traceback
 
-# Health check server eerst — zodat Easypanel ziet dat we draaien
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import json
+print("=== Cadomotus SEO Agent STARTUP ===", flush=True)
+print(f"Python: {sys.version}", flush=True)
+print(f"CWD: {os.getcwd()}", flush=True)
+print(f"Files: {os.listdir('.')}", flush=True)
+print(f"MODE: {os.getenv('MODE', 'not set')}", flush=True)
+print(f"ANTHROPIC_API_KEY set: {bool(os.getenv('ANTHROPIC_API_KEY'))}", flush=True)
 
+# Health check server — start EERST
+try:
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import json
+    from datetime import datetime
 
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        token_exists = os.path.exists(
-            os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")
-        )
-        body = json.dumps({
-            "status": "running",
-            "service": "cadomotus-seo-agent",
-            "mode": os.getenv("MODE", "full"),
-            "google_auth": "ok" if token_exists else "waiting_for_auth",
-            "timestamp": datetime.now().isoformat(),
-        })
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(body.encode())
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"status": "running", "time": str(datetime.now())})
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body.encode())
+        def log_message(self, *args):
+            pass
 
-    def log_message(self, format, *args):
-        pass
+    def _serve():
+        port = int(os.getenv("PORT", "8080"))
+        server = HTTPServer(("0.0.0.0", port), HealthHandler)
+        print(f"[health] Listening on :{port}", flush=True)
+        server.serve_forever()
 
+    t = threading.Thread(target=_serve, daemon=True)
+    t.start()
+    print("[health] Thread gestart", flush=True)
+except Exception as e:
+    print(f"[health] FOUT: {e}", flush=True)
+    traceback.print_exc()
 
-def start_health_server():
-    port = int(os.getenv("PORT", "8080"))
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    print(f"[health] Server op poort {port}", flush=True)
-    server.serve_forever()
-
-
-def wait_for_token():
-    """Wacht tot Google OAuth2 token beschikbaar is."""
-    token_path = os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")
-    while not os.path.exists(token_path):
-        print(
-            f"[auth] Google token niet gevonden op {token_path} — wacht 60s.\n"
-            f"[auth] Voer auth uit: docker exec <container> python agent.py --auth",
-            flush=True,
-        )
-        time.sleep(60)
-    print("[auth] Google token gevonden.", flush=True)
-
-
-def run_reply_watcher():
-    """Start de reply watcher (blokkerend)."""
-    wait_for_token()
-    print("[watcher] Reply watcher starten...", flush=True)
-    try:
-        # Import hier zodat module-level imports niet crashen bij startup
-        from agent import watch_replies
-        watch_replies()
-    except Exception as e:
-        print(f"[watcher] FOUT: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        # Blijf draaien, probeer opnieuw na 60s
-        time.sleep(60)
-        run_reply_watcher()
-
-
-def run_cron_scheduler():
-    """Simpele cron: vrijdag 07:00 het wekelijkse rapport."""
-    import schedule
-
-    def run_report():
-        print("[cron] Wekelijks rapport starten...", flush=True)
-        try:
-            subprocess.run(
-                [sys.executable, "agent.py", "--weekly-report"],
-                timeout=300,
-            )
-            print("[cron] Rapport verzonden.", flush=True)
-        except Exception as e:
-            print(f"[cron] FOUT: {e}", flush=True)
-
-    schedule.every().friday.at("07:00").do(run_report)
-    print("[cron] Wekelijks rapport gepland: elke vrijdag 07:00", flush=True)
-
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
-
-
-def main():
-    print("=== Cadomotus SEO Agent ===", flush=True)
-    print(f"Mode: {os.getenv('MODE', 'full')}", flush=True)
-    print(f"Python: {sys.version}", flush=True)
-
-    # Zorg dat /data bestaat
+# Data dir
+try:
     os.makedirs("/data", exist_ok=True)
+    print("[data] /data dir ok", flush=True)
+except Exception as e:
+    print(f"[data] Kan /data niet aanmaken: {e}", flush=True)
 
-    mode = os.getenv("MODE", "full")
+# Main loop — blijf gewoon draaien
+print("[main] Agent actief. Wacht op Google token...", flush=True)
 
-    # Health check altijd starten
-    health_thread = threading.Thread(target=start_health_server, daemon=True)
-    health_thread.start()
+token_path = os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")
 
-    if mode == "auth":
-        print("[auth] Start OAuth2 flow...", flush=True)
-        subprocess.run([sys.executable, "agent.py", "--auth"])
-        print("[auth] Klaar. Container blijft draaien.", flush=True)
-        # Blijf draaien voor health check
-        while True:
-            time.sleep(3600)
-
-    elif mode == "report":
-        wait_for_token()
-        subprocess.run([sys.executable, "agent.py", "--weekly-report"])
-
-    elif mode in ("full", "watch"):
-        if mode == "full":
-            # Cron scheduler in aparte thread
-            cron_thread = threading.Thread(target=run_cron_scheduler, daemon=True)
-            cron_thread.start()
-
-        # Reply watcher in main thread (blokkerend)
-        run_reply_watcher()
-
+while True:
+    if os.path.exists(token_path):
+        print("[main] Token gevonden! Agent tools laden...", flush=True)
+        try:
+            from agent import watch_replies
+            watch_replies()
+        except Exception as e:
+            print(f"[main] Agent FOUT: {e}", flush=True)
+            traceback.print_exc()
+            time.sleep(60)
     else:
-        print(f"[error] Onbekende mode: {mode}", flush=True)
-        # Blijf draaien voor health check
-        while True:
-            time.sleep(3600)
-
-
-if __name__ == "__main__":
-    main()
+        print(f"[main] Wacht op token: {token_path}", flush=True)
+        time.sleep(60)
