@@ -4,10 +4,11 @@ import os
 import json
 import requests
 
-SHOPIFY_STORE = os.getenv("SHOPIFY_STORE", "cadomotus-com.myshopify.com")
-SHOPIFY_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")
-SHOPIFY_API_VERSION = "2024-10"
-SHOPIFY_URL = f"https://{SHOPIFY_STORE}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+# Shopify via n8n webhook proxy (de directe token auth gaat via n8n)
+SHOPIFY_PROXY_URL = os.getenv(
+    "SHOPIFY_PROXY_URL",
+    "https://maartenklouwen.app.n8n.cloud/webhook/cadomotus-shopify"
+)
 
 SHOPIFY_TOOLS = [
     {
@@ -108,17 +109,25 @@ SHOPIFY_TOOLS = [
 
 
 def _graphql(query: str, variables: dict = None) -> dict:
-    headers = {
-        "X-Shopify-Access-Token": SHOPIFY_TOKEN,
-        "Content-Type": "application/json",
-    }
     body = {"query": query}
     if variables:
         body["variables"] = variables
 
-    resp = requests.post(SHOPIFY_URL, json=body, headers=headers, timeout=30)
+    resp = requests.post(
+        SHOPIFY_PROXY_URL,
+        json=body,
+        headers={"Content-Type": "application/json"},
+        timeout=30,
+    )
     resp.raise_for_status()
     data = resp.json()
+
+    # n8n proxy wrapt response in body.data
+    if "body" in data:
+        inner = data["body"]
+        if "errors" in inner:
+            return {"error": inner["errors"]}
+        return inner.get("data", inner)
 
     if "errors" in data:
         return {"error": data["errors"]}
