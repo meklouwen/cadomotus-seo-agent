@@ -1,19 +1,22 @@
-"""Cadomotus SEO Agent — Docker entrypoint."""
+"""Cadomotus SEO Agent — Docker entrypoint.
+
+Gmail en Shopify draaien via n8n webhook proxies — geen Google OAuth nodig.
+GSC is optioneel (als token beschikbaar is).
+"""
 
 import sys
 import os
 import time
 import threading
 import traceback
+import schedule
 
 print("=== Cadomotus SEO Agent STARTUP ===", flush=True)
 print(f"Python: {sys.version}", flush=True)
-print(f"CWD: {os.getcwd()}", flush=True)
-print(f"Files: {os.listdir('.')}", flush=True)
 print(f"MODE: {os.getenv('MODE', 'not set')}", flush=True)
 print(f"ANTHROPIC_API_KEY set: {bool(os.getenv('ANTHROPIC_API_KEY'))}", flush=True)
 
-# Health check server — start EERST
+# Health check server
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
     import json
@@ -43,27 +46,68 @@ except Exception as e:
     traceback.print_exc()
 
 # Data dir
-try:
-    os.makedirs("/data", exist_ok=True)
-    print("[data] /data dir ok", flush=True)
-except Exception as e:
-    print(f"[data] Kan /data niet aanmaken: {e}", flush=True)
+os.makedirs("/data", exist_ok=True)
 
-# Main loop — blijf gewoon draaien
-print("[main] Agent actief. Wacht op Google token...", flush=True)
 
-token_path = os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")
+def run_weekly_report():
+    """Genereer en verstuur het wekelijkse rapport."""
+    print("[cron] Wekelijks rapport starten...", flush=True)
+    try:
+        from agent import weekly_report
+        weekly_report()
+        print("[cron] Rapport verzonden.", flush=True)
+    except Exception as e:
+        print(f"[cron] FOUT: {e}", flush=True)
+        traceback.print_exc()
 
-while True:
-    if os.path.exists(token_path):
-        print("[main] Token gevonden! Agent tools laden...", flush=True)
+
+def run_reply_watcher():
+    """Poll n8n elke 5 minuten op replies van Diederik."""
+    print("[watcher] Reply watcher gestart.", flush=True)
+    from agent import _check_and_handle_replies, load_system_prompt
+    system_prompt = load_system_prompt()
+
+    while True:
         try:
-            from agent import watch_replies
-            watch_replies()
+            _check_and_handle_replies(system_prompt)
         except Exception as e:
-            print(f"[main] Agent FOUT: {e}", flush=True)
+            print(f"[watcher] FOUT: {e}", flush=True)
             traceback.print_exc()
-            time.sleep(60)
+
+        interval = int(os.getenv("REPLY_POLL_INTERVAL", 300))
+        print(f"[watcher] Volgende check over {interval}s...", flush=True)
+        time.sleep(interval)
+
+
+def main():
+    mode = os.getenv("MODE", "full")
+    print(f"[main] Mode: {mode}", flush=True)
+
+    if mode in ("full", "watch"):
+        if mode == "full":
+            # Cron: vrijdag 07:00
+            schedule.every().friday.at("07:00").do(run_weekly_report)
+            print("[cron] Wekelijks rapport gepland: elke vrijdag 07:00", flush=True)
+
+            # Cron checker in aparte thread
+            def cron_loop():
+                while True:
+                    schedule.run_pending()
+                    time.sleep(60)
+            cron_thread = threading.Thread(target=cron_loop, daemon=True)
+            cron_thread.start()
+
+        # Reply watcher in main thread
+        run_reply_watcher()
+
+    elif mode == "report":
+        run_weekly_report()
+
     else:
-        print(f"[main] Wacht op token: {token_path}", flush=True)
-        time.sleep(60)
+        print(f"[main] Onbekende mode: {mode}. Idle...", flush=True)
+        while True:
+            time.sleep(3600)
+
+
+if __name__ == "__main__":
+    main()

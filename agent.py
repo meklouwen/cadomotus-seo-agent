@@ -160,21 +160,9 @@ Voeg onderaan toe: "Reply op deze mail als je iets wilt aanpassen — ik regel h
 # ---------- Reply watcher ----------
 
 def watch_replies():
-    """Poll Gmail elke X minuten op replies van Diederik."""
+    """Poll n8n elke X minuten op replies van Diederik."""
     log.info("=== Reply watcher gestart (interval: %ds) ===", POLL_INTERVAL)
     system_prompt = load_system_prompt()
-
-    # Wacht tot Google token beschikbaar is
-    token_path = os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")
-    while not os.path.exists(token_path):
-        log.warning(
-            "Google token niet gevonden op %s — wacht 60s. "
-            "Voer auth uit: docker exec <container> python agent.py --auth",
-            token_path,
-        )
-        time.sleep(60)
-
-    log.info("Google token gevonden, reply watcher actief.")
 
     while True:
         try:
