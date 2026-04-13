@@ -72,7 +72,7 @@ def run_agent(task: str, system_prompt: str, max_turns: int = 20) -> str:
 
         response = client.messages.create(
             model=MODEL,
-            max_tokens=4096,
+            max_tokens=8192,
             system=system_prompt,
             tools=api_tools,
             messages=messages,
@@ -140,17 +140,29 @@ Doe het volgende stap voor stap:
 2. Haal quick wins op — pagina's met positie 4-15 en lage CTR.
 3. Haal de nieuwste producten op uit Shopify en check welke geen SEO hebben.
 4. Check PageSpeed voor de homepage (cadomotus.com) op mobile.
-5. Genereer een helder, beknopt rapport in het Nederlands voor Diederik.
-6. Stuur het rapport via gmail_send_report.
+5. Check ALLE 4 TALEN (EN, NL, DE, FR) op ontbrekende of slechte meta titles/descriptions.
+   - Haal vertalingen op via Shopify Translations API voor NL, DE en FR.
+   - Producten/collecties zonder NL/DE/FR meta zijn ook een fix.
+6. Selecteer exact 20 verbeterpunten voor het rapport.
+7. Stuur het rapport via gmail_send_report.
+
+BELANGRIJK — FIXES REGELS:
+- Stuur ALTIJD exact 20 fixes mee in de fixes array. Niet meer, niet minder.
+- Elke fix moet een UNIEKE combinatie van pagina-URL + taal hebben.
+  Dezelfde URL mag meerdere keren voorkomen als het om verschillende talen gaat.
+- Verdeel de fixes over alle 4 talen (EN, NL, DE, FR). Niet alleen EN en NL.
+  Streef naar minimaal 2-3 fixes per taal, meer als er meer issues zijn.
+- Als er minder dan 20 issues zijn, kijk breder: collecties, blog posts, CMS pagina's.
+- Als er meer dan 20 zijn, kies de top 20 op basis van geschatte impact (positie × impressies).
+- Elke fix heeft een uniek id (bijv. "fix-1", "fix-2", etc.).
+- Vermeld bij elke fix duidelijk welke TAAL het betreft (EN/NL/DE/FR).
+- Vermijd dubbele informatie: noem elke pagina+taal combinatie slechts één keer.
 
 Houd het rapport kort en actionable. Diederik is een drukke ondernemer —
 hij wil weten: wat gaat goed, wat kan beter, en wat moet ik doen.
 
 Gebruik deze structuur voor het onderwerp:
-"Cadomotus SEO — {today} | [X] quick wins | [Y] issues"
-
-BELANGRIJK: Als Diederik wil reageren kan hij gewoon op deze mail replyen.
-Voeg onderaan toe: "Reply op deze mail als je iets wilt aanpassen — ik regel het."
+"Cadomotus SEO — {today} | 20 verbeterpunten (EN/NL/DE/FR)"
 """
 
     result = run_agent(task, system_prompt)

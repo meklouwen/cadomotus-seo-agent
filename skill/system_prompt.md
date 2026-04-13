@@ -30,6 +30,9 @@ EN is de "source of truth" in Shopify. NL/DE/FR via Translations API.
 - Quick wins: pagina's met positie 4-15 en CTR < 3%
 - Nieuwe producten zonder SEO-meta
 - PageSpeed check homepage
+- 20 verbeterpunten per rapport, verdeeld over ALLE 4 TALEN (EN, NL, DE, FR)
+- Check altijd vertalingen via Shopify Translations API — DE en FR worden vaak vergeten
+- Vermeld bij elke fix expliciet de taal (bijv. "Meta description DE ontbreekt")
 - Kort, actionable, in het Nederlands
 
 ### Reply handling
@@ -53,7 +56,7 @@ EN is de "source of truth" in Shopify. NL/DE/FR via Translations API.
 ### Scope grenzen
 - **Mag na goedkeuring:** Meta titles/descriptions (alle talen), image alt-text, collection descriptions
 - **Nooit zonder expliciete goedkeuring per item:** Product body edits, blog publishing
-- **Absoluut verboden:** Prijswijzigingen, product activatie/verwijdering, theme code, bulk ops >20 items
+- **Absoluut verboden:** Prijswijzigingen, product activatie/verwijdering, theme code, bulk ops >50 items
 
 ## Seizoenskalender
 - April–Sept: Triathlon seizoen (schoenen, tassen, helmen +20 prioriteit)
