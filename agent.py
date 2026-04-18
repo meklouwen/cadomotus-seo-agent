@@ -29,11 +29,12 @@ logging.basicConfig(
 )
 log = logging.getLogger("cadomotus-agent")
 
-client = Anthropic()
+client = Anthropic(max_retries=5)  # SDK retried 429/5xx automatisch met exponential backoff
 
 SKILL_DIR = Path(__file__).parent / "skill"
 POLL_INTERVAL = int(os.getenv("REPLY_POLL_INTERVAL", 300))
 MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-7")
+MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "16000"))
 
 
 def load_system_prompt() -> str:
@@ -72,16 +73,33 @@ def run_agent(task: str, system_prompt: str, max_turns: int = 20) -> str:
             "input_schema": t["input_schema"],
         })
 
+    # System prompt cachen — stabiel over alle requests, ~90% goedkoper voor cached portion
+    system_blocks = [{
+        "type": "text",
+        "text": system_prompt,
+        "cache_control": {"type": "ephemeral"},
+    }]
+
     for turn in range(max_turns):
         log.info("Agent turn %d/%d", turn + 1, max_turns)
 
         response = client.messages.create(
             model=MODEL,
-            max_tokens=8192,
-            system=system_prompt,
+            max_tokens=MAX_TOKENS,
+            system=system_blocks,
             tools=api_tools,
             messages=messages,
+            thinking={"type": "adaptive"},
+            output_config={"effort": "high"},
         )
+
+        # Log cache hit ratio voor cost monitoring
+        u = response.usage
+        cache_read = getattr(u, "cache_read_input_tokens", 0) or 0
+        cache_write = getattr(u, "cache_creation_input_tokens", 0) or 0
+        if cache_read or cache_write:
+            log.info("Tokens — input:%d cache_read:%d cache_write:%d output:%d",
+                     u.input_tokens, cache_read, cache_write, u.output_tokens)
 
         # Verzamel tekst output
         text_parts = []
