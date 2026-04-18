@@ -33,7 +33,7 @@ client = Anthropic()
 
 SKILL_DIR = Path(__file__).parent / "skill"
 POLL_INTERVAL = int(os.getenv("REPLY_POLL_INTERVAL", 300))
-MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6-20250514")
+MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-7")
 
 
 def load_system_prompt() -> str:
@@ -41,11 +41,16 @@ def load_system_prompt() -> str:
     prompt_parts = []
     skill_files = [
         "system_prompt.md",
+        "brand-voice.md",
+        "fix-playbook.md",
+        "keywords.md",
     ]
     for fname in skill_files:
         fpath = SKILL_DIR / fname
         if fpath.exists():
-            prompt_parts.append(fpath.read_text())
+            prompt_parts.append(f"# === {fname} ===\n\n{fpath.read_text()}")
+        else:
+            log.warning("Skill file ontbreekt: %s", fpath)
 
     if not prompt_parts:
         log.error("Geen system prompt gevonden in %s", SKILL_DIR)
@@ -132,41 +137,91 @@ def weekly_report():
 
     today = datetime.now().strftime("%Y-%m-%d")
 
-    task = f"""Het is {today}, vrijdagochtend. Genereer het wekelijkse SEO-rapport voor Diederik.
+    task = f"""Het is {today}, vrijdagochtend. Genereer het wekelijkse SEO-rapport.
+
+ABSOLUUT BELANGRIJKSTE REGEL — PREVIEW FIRST:
+Deze run MAG NIET direct naar Diederik sturen. Je stuurt ALTIJD eerst een preview
+naar Maarten (preview=true). Maarten controleert, keurt goed, en pas daarna — in een
+volgende run — wordt het echte rapport naar Diederik gestuurd (preview=false).
+
+Als je gmail_send_report aanroept met preview=false zonder goedkeuring: FOUT. Altijd preview=true.
 
 Doe het volgende stap voor stap:
 
 1. Haal GSC search analytics op voor de afgelopen 7 dagen (vergelijk met de 7 dagen daarvoor).
-2. Haal quick wins op — pagina's met positie 4-15 en lage CTR.
+2. Haal quick wins op — pagina's met positie 4-15 en lage CTR (max 20).
 3. Haal de nieuwste producten op uit Shopify en check welke geen SEO hebben.
 4. Check PageSpeed voor de homepage (cadomotus.com) op mobile.
-5. Check ALLE 4 TALEN (EN, NL, DE, FR) op ontbrekende of slechte meta titles/descriptions.
-   - Haal vertalingen op via Shopify Translations API voor NL, DE en FR.
-   - Producten/collecties zonder NL/DE/FR meta zijn ook een fix.
-6. Selecteer exact 20 verbeterpunten voor het rapport.
-7. Stuur het rapport via gmail_send_report.
+5. Check ALLE 4 TALEN (EN, NL, DE, FR) — verzamel kandidaten:
+   - Tot 20 kandidaat-issues PER TAAL (dus potentieel 80 kandidaten totaal).
+   - Haal vertalingen op via shopify_get_translations voor NL, DE en FR.
+   - Ontbrekende NL/DE/FR meta's zijn kandidaten, net als zwakke EN meta's.
+6. Scoor en selecteer de TOP 20 STERKSTE fixes uit alle ~80 kandidaten.
+7. Stuur als PREVIEW via gmail_send_report met preview=true.
+
+SELECTIE-STRATEGIE — 20 PAGINA'S × 4 TALEN:
+Nieuw datamodel: 1 fix = 1 pagina met voorstellen voor alle 4 talen tegelijk.
+20 fixes × tot 4 talen per fix = potentieel 80 daadwerkelijke meta-updates.
+Diederik klikt 20x Goedkeuren en alle talen worden tegelijk bijgewerkt.
+
+- Fase A: identificeer 20 UNIEKE PAGINA'S met de grootste SEO-impact (niet 20 taal-varianten).
+- Fase B: bereken impact score per pagina:
+    impact = (impressies × (verwachte_CTR - huidige_CTR)) + bestseller_bonus
+    Som over alle talen per pagina — zo tellen slechte vertalingen mee in de prioritering.
+- Fase C: voor elke van de 20 pagina's, genereer voorstellen voor:
+    * EN (via shopify_update_seo)
+    * NL (via shopify_update_translation locale=nl)
+    * DE (via shopify_update_translation locale=de)
+    * FR (via shopify_update_translation locale=fr)
+  Minimaal 2 talen per pagina, liefst alle 4.
+- Fase D: voeg elk samen tot 1 fix-object met proposed_values: {EN, NL, DE, FR}.
 
 BELANGRIJK — FIXES REGELS:
-- Stuur ALTIJD exact 20 fixes mee in de fixes array. Niet meer, niet minder.
-- Elke fix moet een UNIEKE combinatie van pagina-URL + taal hebben.
-  Dezelfde URL mag meerdere keren voorkomen als het om verschillende talen gaat.
-- Verdeel de fixes over alle 4 talen (EN, NL, DE, FR). Niet alleen EN en NL.
-  Streef naar minimaal 2-3 fixes per taal, meer als er meer issues zijn.
-- Als er minder dan 20 issues zijn, kijk breder: collecties, blog posts, CMS pagina's.
-- Als er meer dan 20 zijn, kies de top 20 op basis van geschatte impact (positie × impressies).
+- Stuur ALTIJD exact 20 fixes mee. Elke fix = 1 pagina.
+- Elke fix heeft UNIEKE pagina-URL. Geen duplicaten.
+- Elke fix heeft proposed_values met minimaal 2 talen, liefst alle 4 (EN/NL/DE/FR).
+- field is OF "meta_title" OF "meta_description" (1 veld per fix — aparte fix per veld per pagina als beide moeten veranderen).
 - Elke fix heeft een uniek id (bijv. "fix-1", "fix-2", etc.).
-- Vermeld bij elke fix duidelijk welke TAAL het betreft (EN/NL/DE/FR).
-- Vermijd dubbele informatie: noem elke pagina+taal combinatie slechts één keer.
 
-Houd het rapport kort en actionable. Diederik is een drukke ondernemer —
-hij wil weten: wat gaat goed, wat kan beter, en wat moet ik doen.
+KWALITEITSEISEN PER FIX — elke fix moet STERK zijn:
+- proposed_values bevat EXACTE teksten per taal. Geen placeholders.
+- Meta titles: 50-60 tekens per taal, eindigt op "| Cadomotus".
+- Meta descriptions: 140-160 tekens per taal, structuur: [benefit] + [technisch kenmerk] + [CTA].
+- Correcte taal-CTA: EN "Shop now" | NL "Ontdek nu" | DE "Jetzt entdecken" | FR "Découvrez".
+- Gebruik ECHTE data: windtunnel, wattbesparing, gewicht — geen vage claims.
+- estimated_clicks = som van verwachte extra clicks/mnd over alle talen.
+- ON-BRAND: technisch-sportief, CarbonShell™, geen superlatieven (zie brand-voice.md).
 
-Gebruik deze structuur voor het onderwerp:
-"Cadomotus SEO — {today} | 20 verbeterpunten (EN/NL/DE/FR)"
+LAATSTE STAP — DIT MOET JE DOEN (ANDERS IS DE RUN MISLUKT):
+Roep gmail_send_report aan. Dit is verplicht — zonder deze call wordt er niets verstuurd.
+
+Parameters:
+- date: "{today}"
+- subject: "Cadomotus SEO — {today} | 20 verbeterpunten (EN/NL/DE/FR)"
+- performance: object met GSC deltas
+- fixes: array van exact 20 fix-objecten. Elk fix-object bevat:
+    * id (uniek, bijv. "fix-1")
+    * url (echte Shopify product/collection URL — gebruik letterlijk het handle veld uit shopify_get_products)
+    * field ("meta_title" of "meta_description")
+    * resource_type ("product", "collection", of "page")
+    * resource_id (Shopify GID, bijv. "gid://shopify/Product/123...")
+    * current_values: {EN: "...", NL: "...", DE: "...", FR: "..."} (mag missende talen bevatten)
+    * proposed_values: {EN: "...", NL: "...", DE: "...", FR: "..."} (minimaal 2 talen, liefst 4)
+    * primary_keyword, position, ctr, impressions, estimated_clicks
+- preview: true  ← BELANGRIJK: altijd true voor veiligheid
+
+De tool stuurt dan automatisch naar maarten@thesystem.nl met "[PREVIEW]" prefix.
+NOOIT preview=false zonder expliciete goedkeuring.
+
+Als je onvoldoende data hebt voor 20 fixes: stuur alsnog gmail_send_report met de fixes
+die je WEL hebt, en vermeld in text_summary hoeveel er ontbreken en waarom. Beter een
+onvolledige preview dan geen mail.
 """
 
-    result = run_agent(task, system_prompt)
-    log.info("Rapport resultaat: %s", result[:200])
+    result = run_agent(task, system_prompt, max_turns=40)
+    log.info("Rapport resultaat: %s", result[:500])
+    if "gmail_send_report" not in result and "verzonden" not in result.lower() and "sent" not in result.lower():
+        log.warning("Mogelijk mail NIET verstuurd — agent output bevat geen verzend-bevestiging")
 
 
 # ---------- Reply watcher ----------
@@ -190,7 +245,7 @@ def _check_and_handle_replies(system_prompt: str):
     """Check op nieuwe replies en laat de agent ze afhandelen."""
     from tools.gmail import execute_gmail_tool
 
-    replies_json = execute_gmail_tool("gmail_check_replies", {"max_results": 5})
+    replies_json = execute_gmail_tool("gmail_check_replies", {"max_results": 20})
     replies = json.loads(replies_json)
 
     if not replies:

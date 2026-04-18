@@ -51,8 +51,9 @@ GSC_TOOLS = [
     {
         "name": "gsc_quick_wins",
         "description": (
-            "Vind pagina's die bijna bovenaan staan maar te weinig clicks krijgen. "
-            "Positie 4-15 met CTR onder 3%. Dit zijn de makkelijkste SEO-verbeteringen."
+            "Vind de top 20 pagina's die bijna bovenaan staan maar te weinig clicks krijgen. "
+            "Positie 4-15 met CTR onder 3%. Dit zijn de makkelijkste SEO-verbeteringen — "
+            "gebruik deze data om sterke fixes te genereren met geschatte impact."
         ),
         "input_schema": {
             "type": "object",
@@ -93,7 +94,16 @@ def _get_service():
 
 
 def execute_gsc_tool(name: str, input_data: dict) -> str:
-    service = _get_service()
+    try:
+        service = _get_service()
+    except (FileNotFoundError, Exception) as e:
+        return json.dumps({
+            "error": "GSC niet gekoppeld",
+            "detail": str(e),
+            "rows": [],
+            "wins": [],
+            "note": "Genereer rapport zonder GSC-data — gebruik shopify_get_products en shopify_get_translations als data-bron."
+        })
 
     if name == "gsc_search_analytics":
         body = {
@@ -157,7 +167,7 @@ def execute_gsc_tool(name: str, input_data: dict) -> str:
                 })
 
         wins.sort(key=lambda x: x["estimated_extra_clicks"], reverse=True)
-        return json.dumps(wins[:10], indent=2)
+        return json.dumps(wins[:20], indent=2)
 
     elif name == "gsc_index_status":
         result = service.urlInspection().index().inspect(body={

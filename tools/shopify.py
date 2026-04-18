@@ -104,6 +104,28 @@ SHOPIFY_TOOLS = [
                 }
             }
         }
+    },
+    {
+        "name": "shopify_get_translations",
+        "description": (
+            "Haal vertalingen op voor een Shopify resource (product, collectie, pagina). "
+            "Geeft de vertaalde meta_title en meta_description terug per taal."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "resource_id": {
+                    "type": "string",
+                    "description": "Shopify GID (bijv. gid://shopify/Product/123)"
+                },
+                "locale": {
+                    "type": "string",
+                    "enum": ["nl", "de", "fr"],
+                    "description": "Taal om op te halen"
+                }
+            },
+            "required": ["resource_id", "locale"]
+        }
     }
 ]
 
@@ -252,6 +274,23 @@ def execute_shopify_tool(name: str, input_data: dict) -> str:
         }
         """
         result = _graphql(query, {"limit": limit})
+        return json.dumps(result, indent=2)
+
+    elif name == "shopify_get_translations":
+        rid = input_data["resource_id"]
+        locale = input_data["locale"]
+
+        query = """
+        query getTranslations($resourceId: ID!, $locale: String!) {
+          translatableResource(resourceId: $resourceId) {
+            translations(locale: $locale) {
+              key
+              value
+            }
+          }
+        }
+        """
+        result = _graphql(query, {"resourceId": rid, "locale": locale})
         return json.dumps(result, indent=2)
 
     return json.dumps({"error": f"Unknown tool: {name}"})
