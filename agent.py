@@ -83,15 +83,24 @@ def run_agent(task: str, system_prompt: str, max_turns: int = 20) -> str:
     for turn in range(max_turns):
         log.info("Agent turn %d/%d", turn + 1, max_turns)
 
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            system=system_blocks,
-            tools=api_tools,
-            messages=messages,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
-        )
+        # output_config={"effort":...} is nieuw, sommige SDK-versies kennen het niet → fallback
+        create_kwargs = {
+            "model": MODEL,
+            "max_tokens": MAX_TOKENS,
+            "system": system_blocks,
+            "tools": api_tools,
+            "messages": messages,
+            "thinking": {"type": "adaptive"},
+        }
+        try:
+            response = client.messages.create(
+                **create_kwargs,
+                output_config={"effort": "high"},
+            )
+        except TypeError:
+            # Oudere SDK kent output_config niet — draai zonder
+            log.warning("output_config niet ondersteund door SDK, draai zonder effort=high")
+            response = client.messages.create(**create_kwargs)
 
         # Log cache hit ratio voor cost monitoring
         u = response.usage

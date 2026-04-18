@@ -136,20 +136,21 @@ GMAIL_TOOLS = [
         "name": "gmail_reply_thread",
         "description": (
             "Reply op een bestaande Gmail thread (bijv. een reply van Diederik op het SEO-rapport). "
-            "Houdt de conversation thread intact via In-Reply-To header. "
+            "Houdt de conversation thread intact via Gmail's reply-operation. "
+            "Vereist beide: thread_id EN message_id (Gmail message ID — uit gmail_check_replies field 'id'). "
             "Gebruik dit om Diederik's vragen te beantwoorden of voorstellen te bevestigen."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "thread_id": {"type": "string", "description": "Gmail thread ID (uit gmail_check_replies)"},
-                "message_id_header": {"type": "string", "description": "Message-ID header van het bericht waar je op reageert (uit gmail_check_replies)"},
+                "thread_id": {"type": "string", "description": "Gmail thread ID (uit gmail_check_replies, field 'threadId')"},
+                "message_id": {"type": "string", "description": "Gmail message ID (uit gmail_check_replies, field 'id') — VERPLICHT voor reply"},
                 "to": {"type": "string", "description": "Email address van ontvanger (meestal diederik@cadomotus.com)"},
                 "subject": {"type": "string", "description": "Subject (begin met 'Re: ' als reply)"},
                 "body_html": {"type": "string", "description": "HTML body van de reply"},
                 "body_text": {"type": "string", "description": "Plain text fallback"}
             },
-            "required": ["thread_id", "to", "subject", "body_html"]
+            "required": ["thread_id", "message_id", "to", "subject", "body_html"]
         }
     }
 ]
@@ -196,7 +197,7 @@ def execute_gmail_tool(name: str, input_data: dict) -> str:
     elif name == "gmail_reply_thread":
         payload = {
             "thread_id": input_data["thread_id"],
-            "message_id_header": input_data.get("message_id_header", ""),
+            "message_id": input_data["message_id"],  # Gmail messageId — VERPLICHT
             "to": input_data["to"],
             "subject": input_data["subject"],
             "body_html": input_data["body_html"],
