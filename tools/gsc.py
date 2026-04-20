@@ -1,10 +1,16 @@
 """Google Search Console tools voor de Cadomotus SEO agent."""
 
-import os
 import json
+import logging
+import os
 from datetime import datetime, timedelta
+
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
 from tools._google_auth import get_google_credentials
+
+log = logging.getLogger("cadomotus-agent")
 
 SITE_URL = os.getenv("GOOGLE_SITE_URL", "sc-domain:cadomotus.com")
 
@@ -96,15 +102,40 @@ def _get_service():
 def execute_gsc_tool(name: str, input_data: dict) -> str:
     try:
         service = _get_service()
-    except (FileNotFoundError, Exception) as e:
+    except Exception as e:
+        log.warning("GSC_UNAVAILABLE | %s", str(e)[:160])
         return json.dumps({
             "error": "GSC niet gekoppeld",
             "detail": str(e),
             "rows": [],
             "wins": [],
-            "note": "Genereer rapport zonder GSC-data — gebruik shopify_get_products en shopify_get_translations als data-bron."
+            "note": "Rapport draait door zonder GSC-data — gebruik shopify_get_products, "
+                    "shopify_get_collections en shopify_get_translations als bron.",
         })
 
+    try:
+        return _execute_gsc(service, name, input_data)
+    except HttpError as e:
+        log.warning("GSC_HTTP_ERROR | status=%s | %s", getattr(e, "status_code", "?"), str(e)[:200])
+        return json.dumps({
+            "error": "GSC API-fout",
+            "status": getattr(e, "status_code", None),
+            "detail": str(e)[:300],
+            "rows": [],
+            "wins": [],
+            "note": "GSC-call is mislukt maar het rapport moet doorlopen op andere bronnen.",
+        })
+    except Exception as e:
+        log.exception("GSC_UNEXPECTED | %s", e)
+        return json.dumps({
+            "error": "Onverwachte GSC-fout",
+            "detail": str(e)[:300],
+            "rows": [],
+            "wins": [],
+        })
+
+
+def _execute_gsc(service, name: str, input_data: dict) -> str:
     if name == "gsc_search_analytics":
         body = {
             "startDate": input_data["start_date"],

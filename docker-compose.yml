@@ -1,0 +1,52 @@
+# Referentie-compose voor lokale runs en als template voor Easypanel.
+# In Easypanel zet je env-vars via de UI; dit bestand documenteert de verwachte vorm.
+services:
+  cadomotus-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cadomotus-agent:latest
+    container_name: cadomotus-agent
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Europe/Amsterdam
+      MODE: ${MODE:-full}
+      # Secrets — vul in via .env of Easypanel UI, nooit hard-coded.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      SHOPIFY_PROXY_URL: ${SHOPIFY_PROXY_URL}
+      SHOPIFY_PROXY_SECRET: ${SHOPIFY_PROXY_SECRET:-}
+      N8N_REPORT_URL: ${N8N_REPORT_URL}
+      N8N_REPLIES_URL: ${N8N_REPLIES_URL}
+      N8N_REPLY_THREAD_URL: ${N8N_REPLY_THREAD_URL}
+      TRIGGER_TOKEN: ${TRIGGER_TOKEN:-}
+      # Config.
+      GOOGLE_SITE_URL: ${GOOGLE_SITE_URL:-sc-domain:cadomotus.com}
+      GOOGLE_TOKEN_PATH: /data/token.json
+      GOOGLE_CREDENTIALS_PATH: /data/google_credentials.json
+      # Zero-touch OAuth: plak de inhoud van token.json hier als env-var. Bij
+      # eerste container-start wordt die naar /data/token.json geschreven.
+      # Daarna refresht de agent hem zelf op disk — dit env-var mag je daarna
+      # leeg laten. Leeg = GSC wordt geskipt (rapport draait op Shopify-data).
+      GOOGLE_TOKEN_JSON: ${GOOGLE_TOKEN_JSON:-}
+      GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON:-}
+      REPORT_TO: ${REPORT_TO:-diederik@cadomotus.com}
+      REPORT_CC: ${REPORT_CC:-maarten@thesystem.nl}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-4-7}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-48000}
+      REPLY_POLL_INTERVAL: ${REPLY_POLL_INTERVAL:-300}
+      DRY_RUN: ${DRY_RUN:-false}
+      REPORTS_DIR: /data/logs/reports
+    volumes:
+      - cadomotus-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  cadomotus-data:
+    driver: local

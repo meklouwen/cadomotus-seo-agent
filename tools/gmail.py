@@ -1,8 +1,21 @@
 """Gmail tools via n8n webhook proxy — geen Google OAuth nodig."""
 
-import os
 import json
+import logging
+import os
+from datetime import datetime
+from pathlib import Path
+
 import requests
+
+from .validation import validate_fixes
+
+log = logging.getLogger("cadomotus-agent")
+
+# Lokale kopie van elke verzonden preview voor post-mortem inspectie. Niet in git
+# (zie .gitignore advies). Als de directory niet kan worden aangemaakt, wordt
+# de save silently overgeslagen — logs blijven dan de enige bron.
+REPORTS_DIR = Path(os.getenv("REPORTS_DIR", str(Path(__file__).resolve().parents[1] / "logs" / "reports")))
 
 N8N_REPORT_URL = os.getenv(
     "N8N_REPORT_URL",
@@ -90,9 +103,16 @@ GMAIL_TOOLS = [
                             "ctr": {"type": "number", "description": "GSC CTR (primair)"},
                             "impressions": {"type": "integer", "description": "GSC impressies (primair)"},
                             "estimated_clicks": {"type": "integer", "description": "Geschatte extra clicks/mnd over alle talen"},
-                            "primary_keyword": {"type": "string", "description": "Primair zoekwoord voor deze pagina"}
+                            "primary_keyword": {"type": "string", "description": "Primair zoekwoord voor deze pagina"},
+                            "category": {
+                                "type": "string",
+                                "enum": ["shoe", "bag", "helmet", "inline", "ice", "collection", "page", "blog", "other"],
+                                "description": "Categorie van deze pagina — gebruikt voor category-fit validatie."
+                            },
+                            "product_type": {"type": "string", "description": "Letterlijke Shopify productType (voor audit trail)"}
                         },
-                        "required": ["id", "url", "field", "resource_id", "proposed_values"]
+                        "required": ["id", "url", "field", "resource_id", "resource_type",
+                                     "proposed_values", "category", "primary_keyword"]
                     }
                 },
                 "text_summary": {
@@ -158,7 +178,15 @@ GMAIL_TOOLS = [
 
 def execute_gmail_tool(name: str, input_data: dict) -> str:
     if name == "gmail_send_report":
-        is_preview = input_data.get("preview", True)
+        raw_preview = input_data.get("preview", True)
+        # Harde boolean-guard: alleen expliciet Python False telt als productie.
+        # Strings als "false"/"no"/"" worden als True behandeld (= preview). Dit voorkomt
+        # dat een type-coercion (of het model dat "false" als string invult) het rapport
+        # per ongeluk naar Diederik stuurt.
+        if isinstance(raw_preview, bool):
+            is_preview = raw_preview
+        else:
+            is_preview = True
         subject = input_data.get("subject", "")
 
         if is_preview:
@@ -169,30 +197,99 @@ def execute_gmail_tool(name: str, input_data: dict) -> str:
             to_addr = REPORT_TO
             cc_addr = REPORT_CC
 
+        fixes = input_data.get("fixes", []) or []
+
+        # Pre-flight validatie: blokkeert een slechte preview-mail vóór de n8n POST.
+        # Dit is de Python-enforcement bovenop wat het prompt afdwingt.
+        validation = validate_fixes(fixes)
+        if not validation["valid"]:
+            log.warning("VALIDATE_FIXES | invalid | errors=%s", validation["errors"])
+            return json.dumps({
+                "error": "Pre-flight validatie mislukt — herzie je fixes voor je gmail_send_report opnieuw aanroept.",
+                "details": validation["errors"],
+                "warnings": validation["warnings"],
+                "categories": validation["categories"],
+            })
+        if validation["warnings"]:
+            log.info("VALIDATE_FIXES | ok-with-warnings | %s", validation["warnings"])
+
         payload = {
             "to": to_addr,
             "cc": cc_addr,
             "date": input_data.get("date", ""),
             "subject": subject,
             "performance": input_data.get("performance", {}),
-            "fixes": input_data.get("fixes", []),
+            "fixes": fixes,
             "text_summary": input_data.get("text_summary", ""),
             "new_products_html": input_data.get("new_products_html", ""),
             "extra_html": input_data.get("extra_html", ""),
             "preview": is_preview,
+            "validation_summary": {
+                "categories": validation["categories"],
+                "count": validation["count"],
+                "warnings": validation["warnings"],
+            },
         }
+
+        # Sla payload lokaal op voor post-mortem inspectie. Niet-fataal bij falen.
+        try:
+            REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            mode = "preview" if is_preview else "production"
+            out_path = REPORTS_DIR / f"{stamp}-{mode}.json"
+            out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            log.info("REPORT_SAVED | %s", out_path)
+        except OSError as e:
+            log.warning("REPORT_SAVE_FAILED | %s", e)
+
         resp = requests.post(N8N_REPORT_URL, json=payload, timeout=30)
         resp.raise_for_status()
-        return json.dumps({"sent_to": to_addr, "preview": is_preview, "response": resp.json()})
+        try:
+            resp_body = resp.json()
+        except ValueError:
+            resp_body = {"status": resp.status_code}
+        return json.dumps({
+            "sent_to": to_addr,
+            "preview": is_preview,
+            "validation": validation,
+            "response": resp_body,
+        })
 
     elif name == "gmail_check_replies":
-        payload = {
-            "max_results": input_data.get("max_results", 20)
-        }
-        resp = requests.post(N8N_REPLIES_URL, json=payload, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-        return json.dumps(data.get("replies", []), indent=2)
+        # Polling-call die elke 5 min draait. Mag NOOIT crashen — als de webhook
+        # iets anders dan JSON teruggeeft (lege body, HTML errorpage, 502 van
+        # Cloudflare, etc.) loggen we het rustig en doen alsof er geen replies
+        # zijn. Een crash hier zou de watcher-loop volgooien met tracebacks.
+        payload = {"max_results": input_data.get("max_results", 20)}
+        try:
+            resp = requests.post(N8N_REPLIES_URL, json=payload, timeout=30)
+        except requests.RequestException as e:
+            log.warning("gmail_check_replies | netwerkfout: %s", e)
+            return "[]"
+
+        if resp.status_code >= 400:
+            log.warning("gmail_check_replies | HTTP %d van n8n — geen replies verwerkt",
+                        resp.status_code)
+            return "[]"
+
+        body = (resp.text or "").strip()
+        if not body:
+            # Lege body = "geen nieuwe replies" — n8n stuurt dat soms zo terug.
+            return "[]"
+        try:
+            data = resp.json()
+        except ValueError:
+            log.warning("gmail_check_replies | non-JSON respons (%d bytes): %s …",
+                        len(body), body[:120].replace("\n", " "))
+            return "[]"
+
+        if isinstance(data, list):
+            replies = data
+        elif isinstance(data, dict):
+            replies = data.get("replies", []) or []
+        else:
+            replies = []
+        return json.dumps(replies, indent=2)
 
     elif name == "gmail_reply_thread":
         payload = {

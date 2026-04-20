@@ -1,0 +1,18 @@
+# Voorkom dat secrets of lokale state in het image komen.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+token.json
+google_credentials.json
+logs/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+.git/
+.gitignore
+.DS_Store

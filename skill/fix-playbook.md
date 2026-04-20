@@ -143,23 +143,25 @@ NL: "Cadomotus triathlon fietsschoen in brede 4E pasvorm. CarbonShell™ koolsto
 ```
 
 **Helmen (Aero Helmets):**
+> Let op: CarbonShell™ is een zooltechnologie voor fietsschoenen/schaatsen — gebruik hem
+> NIET in helmcopy. Helmen praten over aerodynamica, ventilatie, gewicht en windtunnel.
 ```
 Product "Omega Aero Helmet" (€199):
-EN: "Cadomotus Omega aero helmet — wind tunnel tested aerodynamics for triathlon racing.
-     Lightweight CarbonShell construction. Fits over most cycling glasses. Shop now."
+EN: "Cadomotus Omega aero helmet — wind tunnel tested for triathlon racing. Lightweight
+     construction, superior ventilation. Fits over most cycling glasses. Shop now."
      (158 tekens)
 
 NL: "Cadomotus Omega aerohelm — windtunnel getest voor triathlon. Lichtgewicht
-     CarbonShell constructie. Past over de meeste fietsbrillen. Ontdek nu."
-     (152 tekens)
+     constructie, optimale ventilatie. Past over de meeste fietsbrillen. Ontdek nu."
+     (156 tekens)
 
-DE: "Cadomotus Omega Aerohelm — im Windkanal getestet fur Triathlon. Leichte
-     CarbonShell-Konstruktion. Passt uber die meisten Radsportbrillen. Entdecken."
+DE: "Cadomotus Omega Aerohelm — im Windkanal getestet für Triathlon. Leichte
+     Konstruktion, optimale Belüftung. Passt über die meisten Radbrillen. Jetzt entdecken."
+     (159 tekens)
+
+FR: "Casque aéro Cadomotus Omega — testé en soufflerie pour le triathlon. Construction
+     légère, ventilation optimale. Compatible avec la plupart des lunettes. Découvrez maintenant."
      (158 tekens)
-
-FR: "Casque aero Cadomotus Omega — teste en soufflerie pour le triathlon. Construction
-     CarbonShell legere. Compatible avec la plupart des lunettes velo. Decouvrez."
-     (157 tekens)
 ```
 
 **Wedstrijdtassen (Race Bags):**

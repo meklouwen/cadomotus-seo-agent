@@ -5,3 +5,4 @@ token.json
 google_credentials.json
 *.egg-info/
 .venv/
+logs/

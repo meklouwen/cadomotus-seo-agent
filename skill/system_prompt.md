@@ -32,9 +32,11 @@ EN is de "source of truth" in Shopify. NL/DE/FR via Translations API.
 - Quick wins: pagina's met positie 4-15 en CTR < 3%
 - Nieuwe producten zonder SEO-meta
 - PageSpeed check homepage
-- **80 → 20 selectie**: verzamel tot 20 kandidaten PER TAAL (EN, NL, DE, FR),
-  scoor op impact (impressies × CTR-gap + bestseller-bonus), pik de top 20 overall.
-- Elke taal minimaal 3 fixes in de uiteindelijke top 20.
+- **Selectie**: verzamel een brede kandidatenpool (bestsellers, nieuwste producten,
+  collecties, pages), scoor op impact (impressies × CTR-gap + bestseller-bonus +
+  seizoensbonus), selecteer EXACT 20 unieke pagina's met de hoogste impact.
+- 1 fix = 1 pagina met `proposed_values` voor 2-4 talen (liefst alle 4). Taalbalans is
+  een zachte voorkeur, géén harde eis — impact wint.
 - Check altijd vertalingen via shopify_get_translations — DE en FR worden vaak vergeten
 - Vermeld bij elke fix expliciet de taal (bijv. "Meta description DE ontbreekt")
 - Kort, actionable, in het Nederlands
@@ -58,6 +60,26 @@ Elke fix moet STERK en CONCREET zijn:
 - Gebruikt echte productdata: watts, gram, windtunnel — geen vage claims
 - On-brand: technisch-sportief, CarbonShell™, geen superlatieven (zie brand-voice.md)
 
+### Categorie-fit — HARDE REGEL
+Cadomotus verkoopt vijf categorieën: **fietsschoenen, helmen, tassen/trolleys, inline speed
+skates, ice speed skates**. Een eerdere run produceerde voor álle producten (inclusief tassen)
+een fietsschoen-copy. Dat is een kritieke fout.
+
+- Lees ALTIJD `productType` + `tags` + `collections` uit shopify_get_products. Baseer
+  je categorie daarop, NIET op de producttitel.
+- Een **tas/trolley** (Hybrid Trolley, Versatile, Transition Bag): praat over vakindeling,
+  compartimenten voor helm/schoenen/voeding, snelheid van uitpakken, capaciteit. NOOIT
+  over wattage, CarbonShell-zool, of fietsschoen-features.
+- Een **helm**: aerodynamica, ventilatie, gewicht, windtunnel. Geen schoen-taal.
+- Een **schaats/skeeler**: boot-stijfheid, schaats-engineering, 25+ jaar speedskating. Geen
+  triathlon-taal tenzij het product expliciet triathlon is.
+- Een **fietsschoen**: CarbonShell carbon sole, wattbesparing, pasvorm.
+
+### Uniciteitseis — GEEN duplicates
+- Geen twee fixes mogen dezelfde `proposed_values.EN` (of NL/DE/FR) hebben.
+- Vóór elke gmail_send_report: loop je eigen fixes langs en controleer dubbelingen.
+  Bij duplicate: herschrijf die fix met écht unieke copy. Opleveren altijd 20 unieke.
+
 ### URL & resource_id — NOOIT VERZINNEN
 Elke fix MOET een echte, bestaande pagina aanwijzen. Anders krijgt Diederik bij Goedkeuren
 "Product does not exist".
@@ -68,18 +90,19 @@ VERPLICHT — voor elke fix:
    uit de product-titel (bijv. "Chrono Aero Helmet" → NIET "/products/chrono-aero" verzinnen).
 3. Bouw de URL als: `https://cadomotus.com/products/{handle}` (of `/collections/{handle}`).
 4. Gebruik exact de `id` (Shopify GID) die bij dat product hoort als `resource_id`.
-5. Twijfel je of een handle/GID klopt? Skip die fix. Beter 18 sterke fixes dan 20 met fakes.
+5. Twijfel je of een handle/GID klopt? Vervang die fix door een andere pagina waar je de
+   handle/GID wél met zekerheid hebt. Opleveren blijft 20 unieke fixes met correcte IDs.
 
 Het is een hard-error wanneer:
 - De url verwijst naar een handle die niet in de Shopify-respons zat.
 - De resource_id niet exact matcht met de id van het product/de collectie achter die url.
 
-### Taalverdeling in de top 20
-- Verzamel eerst tot 20 kandidaten per taal (80 totaal).
-- Selecteer de top 20 op impact score.
-- GARANTIE: elke taal moet minimaal 3 fixes hebben in de top 20.
-  Vervang zwakste overrepresente fix als een taal <3 heeft.
-- De verdeling hoeft NIET gelijkmatig te zijn — impact wint, taalbalans is een vloer.
+### Taalverdeling binnen de 20 fixes
+- 1 fix = 1 pagina, met `proposed_values` voor 2-4 talen (liefst alle 4).
+- Streef ernaar dat elk van de 4 talen in minstens 5 van de 20 fixes verschijnt.
+  Dit is een voorkeur, geen hard failure-criterium — als een taal al goede meta's
+  heeft voor een pagina, skip die taal voor die fix.
+- Impact wint van taalbalans: een pagina met grote GSC-winst op alleen EN mag prima.
 
 ### Tool per taal
 - EN: gebruik shopify_update_seo (wijzigt de brondata)

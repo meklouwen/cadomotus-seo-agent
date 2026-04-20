@@ -4,27 +4,85 @@ Gmail en Shopify draaien via n8n webhook proxies — geen Google OAuth nodig.
 GSC is optioneel (als token beschikbaar is).
 """
 
-import sys
+import logging
 import os
-import time
+import sys
 import threading
-import traceback
+import time
+
 import schedule
 
-print("=== Cadomotus SEO Agent STARTUP ===", flush=True)
-print(f"Python: {sys.version}", flush=True)
-print(f"MODE: {os.getenv('MODE', 'not set')}", flush=True)
-print(f"ANTHROPIC_API_KEY set: {bool(os.getenv('ANTHROPIC_API_KEY'))}", flush=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+log = logging.getLogger("cadomotus-main")
 
-# Health check server
+log.info("=== Cadomotus SEO Agent STARTUP ===")
+log.info("Python: %s", sys.version.split()[0])
+log.info("MODE: %s", os.getenv("MODE", "not set"))
+log.info("TZ: %s", os.getenv("TZ", "not set"))
+log.info("ANTHROPIC_API_KEY set: %s", bool(os.getenv("ANTHROPIC_API_KEY")))
+
+# Health + manual trigger server
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
+    from urllib.parse import urlparse, parse_qs
     import json
     from datetime import datetime
 
+    TRIGGER_TOKEN = os.getenv("TRIGGER_TOKEN", "")
+
+    _trigger_lock = threading.Lock()
+    _trigger_running = False
+
+    def _do_trigger():
+        global _trigger_running
+        with _trigger_lock:
+            if _trigger_running:
+                return False, "already running"
+            _trigger_running = True
+        try:
+            log.info("[trigger] Manual weekly_report fired")
+            from agent import weekly_report
+            weekly_report()
+            log.info("[trigger] klaar")
+            return True, "completed"
+        except Exception as e:
+            log.exception("[trigger] FOUT: %s", e)
+            return False, str(e)
+        finally:
+            with _trigger_lock:
+                _trigger_running = False
+
     class HealthHandler(BaseHTTPRequestHandler):
         def do_GET(self):
-            body = json.dumps({"status": "running", "time": str(datetime.now())})
+            parsed = urlparse(self.path)
+            if parsed.path == "/trigger":
+                qs = parse_qs(parsed.query)
+                token = qs.get("token", [""])[0]
+                if not TRIGGER_TOKEN or token != TRIGGER_TOKEN:
+                    self.send_response(401)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "invalid or missing token"}).encode())
+                    return
+                # Start in background, return 202 direct (response binnen seconden, run duurt minuten)
+                threading.Thread(target=_do_trigger, daemon=True).start()
+                self.send_response(202)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"triggered": True, "note": "weekly_report draait nu in background, mail komt binnen ~1-3 min"}).encode())
+                return
+
+            # Default: health
+            body = json.dumps({
+                "status": "running",
+                "time": str(datetime.now()),
+                "trigger_running": _trigger_running,
+                "trigger_endpoint_enabled": bool(TRIGGER_TOKEN),
+            })
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -35,35 +93,49 @@ try:
     def _serve():
         port = int(os.getenv("PORT", "8080"))
         server = HTTPServer(("0.0.0.0", port), HealthHandler)
-        print(f"[health] Listening on :{port}", flush=True)
+        log.info("[health] Listening on :%d", port)
+        if TRIGGER_TOKEN:
+            log.info("[trigger] Endpoint enabled: GET /trigger?token=<TRIGGER_TOKEN>")
         server.serve_forever()
 
     t = threading.Thread(target=_serve, daemon=True)
     t.start()
-    print("[health] Thread gestart", flush=True)
+    log.info("[health] Thread gestart")
 except Exception as e:
-    print(f"[health] FOUT: {e}", flush=True)
-    traceback.print_exc()
+    log.exception("[health] FOUT: %s", e)
 
-# Data dir
-os.makedirs("/data", exist_ok=True)
+# Data-dir voor token, credentials en report-archief.
+# In Easypanel hoort hier een volume gemount te zijn. Lokaal (zonder /data
+# write-access) gebruik je de paden uit env-vars — we proberen alleen die te
+# maken, niet hard /data. Een crash hier zou de hele container neerhalen.
+for _path in {
+    os.path.dirname(os.getenv("GOOGLE_TOKEN_PATH", "/data/token.json")),
+    os.path.dirname(os.getenv("GOOGLE_CREDENTIALS_PATH", "/data/google_credentials.json")),
+    os.getenv("REPORTS_DIR", "/data/logs/reports"),
+}:
+    if not _path:
+        continue
+    try:
+        os.makedirs(_path, exist_ok=True)
+        log.info("[init] dir ok: %s", _path)
+    except OSError as e:
+        log.warning("[init] kon dir %s niet aanmaken: %s — sla over", _path, e)
 
 
 def run_weekly_report():
     """Genereer en verstuur het wekelijkse rapport."""
-    print("[cron] Wekelijks rapport starten...", flush=True)
+    log.info("[cron] Wekelijks rapport starten...")
     try:
         from agent import weekly_report
         weekly_report()
-        print("[cron] Rapport verzonden.", flush=True)
+        log.info("[cron] Rapport verzonden.")
     except Exception as e:
-        print(f"[cron] FOUT: {e}", flush=True)
-        traceback.print_exc()
+        log.exception("[cron] FOUT: %s", e)
 
 
 def run_reply_watcher():
     """Poll n8n elke 5 minuten op replies van Diederik."""
-    print("[watcher] Reply watcher gestart.", flush=True)
+    log.info("[watcher] Reply watcher gestart.")
     from agent import _check_and_handle_replies, load_system_prompt
     system_prompt = load_system_prompt()
 
@@ -71,25 +143,24 @@ def run_reply_watcher():
         try:
             _check_and_handle_replies(system_prompt)
         except Exception as e:
-            print(f"[watcher] FOUT: {e}", flush=True)
-            traceback.print_exc()
+            log.exception("[watcher] FOUT: %s", e)
 
         interval = int(os.getenv("REPLY_POLL_INTERVAL", 300))
-        print(f"[watcher] Volgende check over {interval}s...", flush=True)
+        log.info("[watcher] Volgende check over %ds...", interval)
         time.sleep(interval)
 
 
 def main():
     mode = os.getenv("MODE", "full")
-    print(f"[main] Mode: {mode}", flush=True)
+    log.info("[main] Mode: %s", mode)
 
     if mode in ("full", "watch"):
         if mode == "full":
-            # Cron: vrijdag 07:00
+            # Cron: vrijdag 07:00 Europe/Amsterdam (TZ wordt in Dockerfile gezet).
             schedule.every().friday.at("07:00").do(run_weekly_report)
-            print("[cron] Wekelijks rapport gepland: elke vrijdag 07:00", flush=True)
+            log.info("[cron] Wekelijks rapport gepland: elke vrijdag 07:00 %s",
+                     os.getenv("TZ", "lokale tijd"))
 
-            # Cron checker in aparte thread
             def cron_loop():
                 while True:
                     schedule.run_pending()
@@ -104,7 +175,7 @@ def main():
         run_weekly_report()
 
     else:
-        print(f"[main] Onbekende mode: {mode}. Idle...", flush=True)
+        log.warning("[main] Onbekende mode: %s. Idle...", mode)
         while True:
             time.sleep(3600)
 
