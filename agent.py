@@ -34,8 +34,14 @@ client = Anthropic(max_retries=5)  # SDK retried 429/5xx automatisch met exponen
 
 SKILL_DIR = Path(__file__).parent / "skill"
 POLL_INTERVAL = int(os.getenv("REPLY_POLL_INTERVAL", 300))
-MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-7")
-MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "48000"))
+# Default = Sonnet 4.6: ~22× goedkoper dan Opus voor de gestructureerde
+# meta-tekst-generatie van Cadomotus. ~$2/run vs ~$44/run met Opus. Voor
+# tijdelijke kwaliteits-experimenten kun je via env vars terugvallen op
+# Opus 4.7 ("claude-opus-4-7") of Haiku 4.5 ("claude-haiku-4-5") proberen.
+MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
+# Sonnet schrijft een complete 20-fix payload ruim binnen 16k output tokens.
+# Hoger zetten kost alleen geld, geen extra kwaliteit.
+MAX_TOKENS = int(os.getenv("CLAUDE_MAX_TOKENS", "16000"))
 
 
 def load_system_prompt() -> str:
@@ -346,7 +352,11 @@ collecties + pages hebt doorgenomen en écht onder 20 komt: stuur gmail_send_rep
 wat je hebt en leg in text_summary haarfijn uit welke bronnen zijn uitgeput en waarom.
 """
 
-    result = run_agent(task, system_prompt, max_turns=80)
+    # 30 turns is genoeg voor 20 fixes met per-product inspectie via tool-calls.
+    # 80 was overkill (kost veel cache-reads zonder waarde). Als de run vaak op de
+    # limiet komt, override via env-var CLAUDE_MAX_TURNS.
+    max_turns = int(os.getenv("CLAUDE_MAX_TURNS", "30"))
+    result = run_agent(task, system_prompt, max_turns=max_turns)
     log.info("Rapport resultaat: %s", result[:500])
     if "gmail_send_report" not in result and "verzonden" not in result.lower() and "sent" not in result.lower():
         log.warning("Mogelijk mail NIET verstuurd — agent output bevat geen verzend-bevestiging")

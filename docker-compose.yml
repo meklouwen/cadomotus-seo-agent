@@ -33,8 +33,9 @@ services:
       GOOGLE_CREDENTIALS_JSON: ${GOOGLE_CREDENTIALS_JSON:-}
       REPORT_TO: ${REPORT_TO:-diederik@cadomotus.com}
       REPORT_CC: ${REPORT_CC:-maarten@thesystem.nl}
-      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-4-7}
-      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-48000}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-4-6}
+      CLAUDE_MAX_TOKENS: ${CLAUDE_MAX_TOKENS:-16000}
+      CLAUDE_MAX_TURNS: ${CLAUDE_MAX_TURNS:-30}
       REPLY_POLL_INTERVAL: ${REPLY_POLL_INTERVAL:-300}
       DRY_RUN: ${DRY_RUN:-false}
       REPORTS_DIR: /data/logs/reports
