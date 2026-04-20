@@ -25,6 +25,18 @@ log.info("MODE: %s", os.getenv("MODE", "not set"))
 log.info("TZ: %s", os.getenv("TZ", "not set"))
 log.info("ANTHROPIC_API_KEY set: %s", bool(os.getenv("ANTHROPIC_API_KEY")))
 
+# Veiligheidswaarschuwingen bij startup — leeg betekent niet stuk, maar wel risico.
+if not os.getenv("SHOPIFY_PROXY_SECRET", "").strip():
+    log.warning("[security] SHOPIFY_PROXY_SECRET is LEEG — n8n webhook is publiek "
+                "aanroepbaar als de n8n workflow zelf geen auth-check heeft. "
+                "Zet bij voorkeur een random Bearer-token in n8n + Easypanel.")
+if not os.getenv("TRIGGER_TOKEN", "").strip():
+    log.info("[security] TRIGGER_TOKEN is leeg — handmatige /trigger endpoint is uit. "
+             "Cron op vrijdag 07:00 werkt sowieso.")
+if not os.getenv("GOOGLE_TOKEN_JSON", "").strip() and not os.getenv("GOOGLE_TOKEN_PATH"):
+    log.info("[oauth] Geen GOOGLE_TOKEN_JSON env-var en geen TOKEN_PATH — GSC werkt "
+             "alleen als /data/token.json al bestaat (mounted volume met eerder token).")
+
 # Health + manual trigger server
 try:
     from http.server import HTTPServer, BaseHTTPRequestHandler
