@@ -13,6 +13,20 @@ META_DESC_RANGE = (140, 160)
 META_TITLE_HARD = (40, 70)
 META_DESC_HARD = (120, 175)
 
+# Lengte-regels per niet-meta veld. (ideaal_min, ideaal_max, hard_min, hard_max).
+FIELD_LENGTH_RULES = {
+    "meta_title":            (50, 60, 40, 70),
+    "meta_description":      (140, 160, 120, 175),
+    "image_alt":             (40, 100, 5, 125),     # Beschrijvend, niet keyword-stuffing
+    "collection_body":       (200, 600, 80, 1500),  # Korte intro, niet artikel
+    "page_body":             (300, 2500, 100, 5000),
+}
+
+# Welke field-types zijn auto-applybaar (bulk approve flow) versus alleen suggestie
+AUTO_APPLY_FIELDS = {"meta_title", "meta_description", "image_alt", "collection_body"}
+SUGGESTION_ONLY_FIELDS = {"page_body", "product_body"}  # Per item review nodig
+ALL_VALID_FIELDS = AUTO_APPLY_FIELDS | SUGGESTION_ONLY_FIELDS
+
 
 # Canonieke categorie-labels voor Cadomotus. In de actuele Shopify-store is
 # `productType` LEEG voor alle producten — categorie zit in tags (bv. "helmet",
@@ -142,27 +156,25 @@ def _len_issue(label: str, text: str, ideal: Tuple[int, int], hard: Tuple[int, i
     return ""
 
 
-def validate_fixes(fixes: list, expected_count: int = 20) -> dict:
+def validate_fixes(fixes: list, expected_count: int = 22) -> dict:
     """Valideer de fixes-array vóór gmail_send_report. Retourneert een dict met
-    errors (blokkerend) en warnings (loggen)."""
+    errors (blokkerend) en warnings (loggen). Doel ~22 (gemiddeld 20-25)."""
     errors: list = []
     warnings: list = []
 
     if not isinstance(fixes, list):
         return {"valid": False, "errors": ["fixes is geen array"], "warnings": []}
 
-    if len(fixes) != expected_count:
-        # Soft: het runtime-prompt forceert 20, maar we laten 15+ nog door zodat
-        # écht uitgeputte catalogi niet blokkeren. Onder 15 is een hard-fail.
-        if len(fixes) < 15:
-            errors.append(f"Te weinig fixes: {len(fixes)} (minimum 15, doel {expected_count})")
-        else:
-            warnings.append(f"{len(fixes)} fixes (doel {expected_count})")
+    # Soft window: 15-30 is OK, daarbuiten warning. Onder 12 hard fail.
+    if len(fixes) < 12:
+        errors.append(f"Te weinig fixes: {len(fixes)} (minimum 12, doel ~{expected_count})")
+    elif len(fixes) < 15 or len(fixes) > 30:
+        warnings.append(f"{len(fixes)} fixes (doel ~{expected_count}, range 15-30)")
 
-    seen_urls: set = set()
-    seen_rid: set = set()
+    seen_url_field: set = set()
     per_lang_texts = {"EN": set(), "NL": set(), "DE": set(), "FR": set()}
     categories_seen: dict = {}
+    fields_seen: dict = {}  # tel hoeveel per field-type (rapport-spreiding)
 
     required_keys = ("id", "url", "field", "resource_id", "proposed_values")
     for i, fix in enumerate(fixes, start=1):
@@ -175,41 +187,58 @@ def validate_fixes(fixes: list, expected_count: int = 20) -> dict:
             errors.append(f"Fix #{i}: ontbrekende velden {missing}")
             continue
 
-        # Unieke URL + resource_id.
+        # Uniciteit op URL+field combinatie. Een product mag wel meta_title én
+        # image_alt hebben — dat is twee fixes met dezelfde URL maar ander field.
         url = fix["url"]
-        rid = fix["resource_id"]
-        if url in seen_urls:
-            errors.append(f"Fix #{i}: duplicate URL {url}")
-        seen_urls.add(url)
-        if rid in seen_rid:
-            warnings.append(f"Fix #{i}: duplicate resource_id {rid} (ok bij titel+desc split)")
-        seen_rid.add(rid)
+        url_field = (url, fix.get("field", ""))
+        if url_field in seen_url_field:
+            errors.append(f"Fix #{i}: duplicate URL+field combinatie {url_field}")
+        seen_url_field.add(url_field)
 
         # Field enum.
         field = fix["field"]
-        if field not in ("meta_title", "meta_description"):
-            errors.append(f"Fix #{i}: field moet meta_title of meta_description zijn, niet {field!r}")
+        if field not in ALL_VALID_FIELDS:
+            errors.append(
+                f"Fix #{i}: field {field!r} onbekend. Geldig: {sorted(ALL_VALID_FIELDS)}"
+            )
+            continue
+        fields_seen[field] = fields_seen.get(field, 0) + 1
 
-        # proposed_values: min 2 talen, lengtes correct, uniek binnen taal.
+        # image_alt is store-wide (geen vertaling). Andere zijn meertalig.
+        single_lang_field = (field == "image_alt")
+
         pv = fix.get("proposed_values") or {}
         if not isinstance(pv, dict):
             errors.append(f"Fix #{i}: proposed_values is geen object")
             continue
-        filled = [lang for lang in ("EN", "NL", "DE", "FR") if (pv.get(lang) or "").strip()]
-        if len(filled) < 2:
-            errors.append(f"Fix #{i}: minimaal 2 talen vereist, gevuld: {filled}")
 
-        ideal, hard = (META_TITLE_RANGE, META_TITLE_HARD) if field == "meta_title" else (META_DESC_RANGE, META_DESC_HARD)
+        if single_lang_field:
+            # Verwacht alleen "EN" key (of "default") met de alt-tekst.
+            text = (pv.get("EN") or pv.get("default") or "").strip()
+            if not text:
+                errors.append(f"Fix #{i}: image_alt heeft geen tekst (key 'EN' of 'default')")
+                continue
+            filled = ["EN"]
+        else:
+            filled = [lang for lang in ("EN", "NL", "DE", "FR") if (pv.get(lang) or "").strip()]
+            if len(filled) < 2:
+                errors.append(f"Fix #{i}: minimaal 2 talen vereist, gevuld: {filled}")
+
+        # Lengte-rules per veld-type.
+        rule = FIELD_LENGTH_RULES.get(field)
+        ideal = (rule[0], rule[1]) if rule else (0, 99999)
+        hard = (rule[2], rule[3]) if rule else (0, 99999)
+
         for lang in filled:
             text = pv[lang].strip()
-            # Lengte.
-            issue = _len_issue(f"Fix #{i} {lang}", text, ideal, hard)
+            issue = _len_issue(f"Fix #{i} {field} {lang}", text, ideal, hard)
             if issue:
                 (errors if "BUITEN hard" in issue else warnings).append(issue)
-            # Uniek per taal.
-            if text in per_lang_texts[lang]:
-                errors.append(f"Fix #{i}: duplicate {lang}-tekst (botst met eerdere fix)")
-            per_lang_texts[lang].add(text)
+            # Uniek per taal — alleen voor meta-velden, alt-text mag herhaling.
+            if not single_lang_field:
+                if text in per_lang_texts[lang]:
+                    errors.append(f"Fix #{i}: duplicate {lang}-tekst (botst met eerdere fix)")
+                per_lang_texts[lang].add(text)
 
         # Category-fit: als er category-context is, check op clash-termen.
         category = (fix.get("category") or fix.get("product_type") or "").strip().lower()
@@ -237,5 +266,6 @@ def validate_fixes(fixes: list, expected_count: int = 20) -> dict:
         "errors": errors,
         "warnings": warnings,
         "categories": categories_seen,
+        "fields": fields_seen,
         "count": len(fixes),
     }

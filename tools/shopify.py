@@ -147,7 +147,81 @@ SHOPIFY_TOOLS = [
             },
             "required": ["resource_id", "locale"]
         }
-    }
+    },
+    {
+        "name": "shopify_get_pages",
+        "description": (
+            "Haal CMS pages op (about, FAQ, terms, etc). Bevat title, body_html, "
+            "seo, handle. Gebruik om pagina's te scannen op SEO-issues."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 25, "description": "Max 50"},
+            },
+        },
+    },
+    {
+        "name": "shopify_get_articles",
+        "description": (
+            "Haal blog-artikelen op uit alle blogs. Bevat title, body_html, summary, "
+            "tags, publishedAt, seo, handle. Gebruik om blog-content te scannen."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 20, "description": "Max 50"},
+            },
+        },
+    },
+    {
+        "name": "shopify_update_image_alt",
+        "description": (
+            "Werk de alt-tekst van één productafbeelding bij. Vereist productId + "
+            "imageId. Alt is store-wide (geen vertaling per taal in Shopify Admin API)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "string", "description": "Shopify GID van het product"},
+                "image_id": {"type": "string", "description": "Shopify GID van de image"},
+                "alt_text": {"type": "string", "description": "Nieuwe alt-tekst, max 125 tekens"},
+            },
+            "required": ["product_id", "image_id", "alt_text"],
+        },
+    },
+    {
+        "name": "shopify_update_collection_body",
+        "description": (
+            "Werk de description (body) van een collectie bij. Dit is de zichtbare "
+            "tekst onder de titel op de collectiepagina, NIET de meta-description. "
+            "Beperk tot ~600 tekens. Voor vertalingen gebruik shopify_update_translation "
+            "met key 'body_html'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "resource_id": {"type": "string", "description": "Collection GID"},
+                "description": {"type": "string", "description": "HTML/tekst body"},
+            },
+            "required": ["resource_id", "description"],
+        },
+    },
+    {
+        "name": "shopify_update_page_body",
+        "description": (
+            "Werk de body van een CMS page bij (bv. About, FAQ). Wees behoudend — "
+            "dit is content die klanten lezen. Gebruik alleen na expliciete review."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "resource_id": {"type": "string", "description": "Page GID"},
+                "body": {"type": "string", "description": "HTML body"},
+            },
+            "required": ["resource_id", "body"],
+        },
+    },
 ]
 
 
@@ -579,5 +653,142 @@ def execute_shopify_tool(name: str, input_data: dict) -> str:
             return res
 
         return _shopify_call("shopify_get_translations", run, input_data)
+
+    elif name == "shopify_get_pages":
+        limit = min(input_data.get("limit", 25), 50)
+
+        def run():
+            query = """
+            query getPages($limit: Int!) {
+              pages(first: $limit, sortKey: UPDATED_AT, reverse: true) {
+                nodes {
+                  id title handle
+                  body bodySummary
+                  isPublished publishedAt updatedAt
+                  templateSuffix
+                }
+              }
+            }
+            """
+            res = _graphql(query, {"limit": limit})
+            if isinstance(res, dict):
+                pages = (res.get("pages") or {}).get("nodes") or []
+                for p in pages:
+                    body = p.get("body")
+                    if isinstance(body, str) and len(body) > 800:
+                        p["body"] = body[:800] + " …[trunc]"
+            return res
+
+        return _shopify_call("shopify_get_pages", run, input_data)
+
+    elif name == "shopify_get_articles":
+        limit = min(input_data.get("limit", 20), 50)
+
+        def run():
+            query = """
+            query getArticles($limit: Int!) {
+              articles(first: $limit, sortKey: PUBLISHED_AT, reverse: true) {
+                nodes {
+                  id title handle
+                  body summary
+                  tags publishedAt
+                  isPublished
+                  blog { id title handle }
+                }
+              }
+            }
+            """
+            res = _graphql(query, {"limit": limit})
+            if isinstance(res, dict):
+                articles = (res.get("articles") or {}).get("nodes") or []
+                for a in articles:
+                    body = a.get("body")
+                    if isinstance(body, str) and len(body) > 800:
+                        a["body"] = body[:800] + " …[trunc]"
+            return res
+
+        return _shopify_call("shopify_get_articles", run, input_data)
+
+    elif name == "shopify_update_image_alt":
+        product_id = input_data.get("product_id")
+        image_id = input_data.get("image_id")
+        alt_text = (input_data.get("alt_text") or "").strip()
+
+        if not (product_id and image_id):
+            return json.dumps({"error": "product_id en image_id zijn verplicht"})
+        if not alt_text:
+            return json.dumps({"error": "alt_text is leeg"})
+        if len(alt_text) > 125:
+            return json.dumps({"error": f"alt_text te lang: {len(alt_text)} tekens (max 125)"})
+
+        def run():
+            if DRY_RUN:
+                return {"dry_run": True, "operation": "productImageUpdate",
+                        "would_set_alt": {"product_id": product_id, "image_id": image_id, "alt": alt_text}}
+            mutation = """
+            mutation updateImageAlt($productId: ID!, $image: ImageInput!) {
+              productImageUpdate(productId: $productId, image: $image) {
+                userErrors { field message }
+              }
+            }
+            """
+            return _graphql(mutation, {
+                "productId": product_id,
+                "image": {"id": image_id, "altText": alt_text},
+            })
+
+        return _shopify_call("shopify_update_image_alt", run, input_data)
+
+    elif name == "shopify_update_collection_body":
+        rid = input_data.get("resource_id")
+        body = (input_data.get("description") or "").strip()
+        if not rid:
+            return json.dumps({"error": "resource_id ontbreekt"})
+        if not body:
+            return json.dumps({"error": "description is leeg"})
+        # Behoudende grens: 1500 tekens. Veel langer = je verandert te veel ineens.
+        if len(body) > 1500:
+            return json.dumps({"error": f"body te lang: {len(body)} tekens (max 1500)"})
+
+        def run():
+            if DRY_RUN:
+                return {"dry_run": True, "operation": "collectionUpdate",
+                        "would_update": {"id": rid, "descriptionHtml_chars": len(body)}}
+            mutation = """
+            mutation updateCollectionBody($input: CollectionInput!) {
+              collectionUpdate(input: $input) {
+                userErrors { field message }
+              }
+            }
+            """
+            return _graphql(mutation, {"input": {"id": rid, "descriptionHtml": body}})
+
+        return _shopify_call("shopify_update_collection_body", run, input_data)
+
+    elif name == "shopify_update_page_body":
+        rid = input_data.get("resource_id")
+        body = (input_data.get("body") or "").strip()
+        if not rid:
+            return json.dumps({"error": "resource_id ontbreekt"})
+        if not body:
+            return json.dumps({"error": "body is leeg"})
+        # Pages mogen langer zijn (5000 chars) maar nooit een hele blog dump.
+        if len(body) > 5000:
+            return json.dumps({"error": f"body te lang: {len(body)} tekens (max 5000)"})
+
+        def run():
+            if DRY_RUN:
+                return {"dry_run": True, "operation": "pageUpdate",
+                        "would_update": {"id": rid, "body_chars": len(body)}}
+            mutation = """
+            mutation updatePageBody($input: PageInput!) {
+              pageUpdate(input: $input) {
+                userErrors { field message }
+              }
+            }
+            """
+            return _graphql(mutation, {"input": {"id": rid, "body": body}})
+
+        return _shopify_call("shopify_update_page_body", run, input_data)
 
     return json.dumps({"error": f"Unknown tool: {name}"})

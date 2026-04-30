@@ -214,26 +214,57 @@ Diederik klikt 20x Goedkeuren en alle talen worden tegelijk bijgewerkt.
 - Fase D: voeg elk samen tot 1 fix-object met proposed_values: {{EN, NL, DE, FR}}.
 
 BELANGRIJK — FIXES REGELS:
-- Stuur EXACT 20 fixes mee, en alle 20 MOETEN compleet verschillende pagina's zijn met
-  compleet verschillende proposed_values. Elke fix = 1 pagina.
-- Elke fix heeft UNIEKE pagina-URL. Geen duplicaten.
-- Elke fix heeft proposed_values met minimaal 2 talen, liefst alle 4 (EN/NL/DE/FR).
-- field is OF "meta_title" OF "meta_description" (1 veld per fix — aparte fix per veld per
-  pagina als beide moeten veranderen).
-- Elke fix heeft een uniek id (bijv. "fix-1", "fix-2", etc.).
+- Stuur 20-25 fixes mee, gespreid over de fix-types (zie AUDIT-SCOPE hierboven).
+  Elke fix is uniek (URL + field combinatie, niet alleen URL).
+- Voor meta_title/meta_description/collection_body/page_body: proposed_values heeft
+  minimaal 2 talen (liefst alle 4). Voor image_alt: alleen "EN" key (store-wide).
+- Een product kan twee fixes hebben (1 voor meta_title, 1 voor image_alt) — de URL
+  is gelijk maar field verschilt, dat is OK.
+- Elke fix heeft een uniek id (bijv. "fix-1", "fix-2").
 
-SCAN-STRATEGIE — HOE KOM JE AAN 20 VERSCHILLENDE ISSUES:
+AUDIT-SCOPE — VERBREED voorbij alleen meta-tags:
+Je auditeert nu BREDER dan alleen meta_title/meta_description. Beschikbare fix-types
+en hoeveel je er per rapport mag voorstellen:
+
+  - meta_title          (auto-apply, 4 talen)         — doel: ~10 fixes
+  - meta_description    (auto-apply, 4 talen)         — doel: ~8 fixes
+  - image_alt           (auto-apply, store-wide tekst) — doel: ~3 fixes
+  - collection_body     (auto-apply, beschrijving)    — doel: ~2 fixes
+  - page_body           (suggestie, geen bulk-apply)  — doel: ~1-2 fixes
+  - product_body        (suggestie, geen bulk-apply)  — doel: ~0-1 fixes
+
+Totaal ~25 fixes per rapport, gespreid over types. ALLE auto-apply types tellen
+voor de validator als gewone fix (lengte, uniciteit, categorie-fit). De
+suggestie-types (page_body, product_body) gaan in een aparte sectie van het
+rapport — Diederik moet ze per stuk goedkeuren in een aparte review.
+
+Voor image_alt: gebruik shopify_get_products om featuredImage.altText op te
+halen; als leeg of "image" → fix kandidaat. proposed_values heeft alleen "EN"
+key (Shopify slaat alt store-wide op).
+
+Voor collection_body: shopify_get_collections heeft `description` veld. Als
+leeg of < 80 tekens → fix kandidaat. Schrijf 200-600 tekens met categorie-USP.
+
+Voor page_body: shopify_get_pages → check pages met dunne body (<200 tekens).
+Stel een uitbreiding voor maar markeer als 'suggestion-only' in het rapport.
+
+Voor blog-articles: shopify_get_articles → kijk naar artikelen met lege seo
+of summary. Voorstellen voor meta_title/meta_description (geen body-rewrite).
+
+SCAN-STRATEGIE — HOE KOM JE AAN ~25 VERSCHILLENDE ISSUES:
 Je moet DOORSCANNEN tot je 20 écht verschillende pagina's hebt met echte problemen. Niet
 stoppen bij de eerste 20 producten die je ophaalt. Volgorde:
 
-1. shopify_get_products(limit=50, sort_by=UPDATED_AT) → recent gewijzigd (proxy voor "actief").
+1. shopify_get_products(limit=50, sort_by=UPDATED_AT) → recent gewijzigd.
 2. shopify_get_products(limit=50, sort_by=CREATED_AT) → nieuwste producten.
-   (Let op: Shopify Admin API kent geen BEST_SELLING sort. Gebruik UPDATED_AT of
-   INVENTORY_TOTAL als proxy, of cross-reference met de orders-Sheet als die
-   beschikbaar is.)
-3. shopify_get_collections(limit=50) → collecties met lege/zwakke SEO.
-4. Check ook Shopify pages (CMS) en top-blogartikelen als je meer nodig hebt.
-5. Pool je gevonden issues en dedup op URL.
+   Shopify Admin API kent geen BEST_SELLING sort — gebruik UPDATED_AT of
+   INVENTORY_TOTAL.
+3. shopify_get_collections(limit=50) → check seo + description (body).
+4. shopify_get_pages(limit=25) → CMS-pagina's (about, FAQ, terms).
+5. shopify_get_articles(limit=20) → blog-artikelen met zwakke seo of summary.
+6. Voor product image_alt: per gekozen product haal je featuredImage.altText op
+   uit de products-respons. Als leeg/zwak → image_alt fix.
+7. Pool alle gevonden issues, dedup op URL+field combinatie.
 
 Scoor alle kandidaten op impact = (impressies × CTR-gap) + bestseller-bonus + seizoensbonus.
 Selecteer de top 20 met als HARDE SPREIDINGSEIS: minstens 4 verschillende productType-waarden

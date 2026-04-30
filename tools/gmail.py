@@ -76,7 +76,19 @@ GMAIL_TOOLS = [
                         "properties": {
                             "id": {"type": "string", "description": "Uniek ID voor deze fix"},
                             "url": {"type": "string", "description": "URL van de pagina (primaire EN-URL)"},
-                            "field": {"type": "string", "enum": ["meta_title", "meta_description"], "description": "Welk SEO-veld wordt aangepast"},
+                            "field": {
+                                "type": "string",
+                                "enum": ["meta_title", "meta_description", "image_alt",
+                                         "collection_body", "page_body", "product_body"],
+                                "description": (
+                                    "Wat wordt aangepast. "
+                                    "meta_title/meta_description: SEO-velden, meertalig. "
+                                    "image_alt: store-wide, één taal. "
+                                    "collection_body: collectie-beschrijving. "
+                                    "page_body: CMS-pagina body (review per item nodig). "
+                                    "product_body: alleen suggestie, niet auto-apply."
+                                ),
+                            },
                             "resource_id": {"type": "string", "description": "Shopify GID (wordt gebruikt voor alle 4 taal-mutations)"},
                             "resource_type": {"type": "string", "enum": ["product", "collection", "page"], "description": "Type Shopify resource"},
                             "current_values": {
