@@ -43,9 +43,16 @@ from tools.shopify import _graphql
 log = logging.getLogger("cadomotus-full-seo")
 
 BASE = "https://cadomotus.com"
+# Reguliere Chrome user-agent — Cloudflare blokkeert bekende bot-strings
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; CadomotusSEOBot/2.0; +https://thesystem.nl)",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
 }
 
 SITEMAP_INDEX = f"{BASE}/sitemap.xml"
@@ -116,20 +123,58 @@ def _fetch_urls_from_sitemap(url: str) -> list:
         log.warning("[full_audit] sitemap fout %s: %s", url, e)
     return []
 
+# Fallback sitemaps als cadomotus.com de index-sitemap niet serveert (bijv. Cloudflare-ban)
+_FALLBACK_SITEMAPS = [
+    "https://cadomotus.com/sitemap_products_1.xml?from=9682207441182&to=10119519961374",
+    "https://cadomotus.com/sitemap_pages_1.xml?from=140724535582&to=160297976094",
+    "https://cadomotus.com/sitemap_collections_1.xml?from=636039987486&to=651201741086",
+    "https://cadomotus.com/sitemap_blogs_1.xml",
+    "https://cadomotus.com/nl/sitemap_products_1.xml?from=9682207441182&to=10119519961374",
+    "https://cadomotus.com/nl/sitemap_pages_1.xml?from=140724535582&to=160297976094",
+    "https://cadomotus.com/nl/sitemap_collections_1.xml?from=636039987486&to=651201741086",
+    "https://cadomotus.com/nl/sitemap_blogs_1.xml",
+    "https://cadomotus.com/de/sitemap_products_1.xml?from=9682207441182&to=10119519961374",
+    "https://cadomotus.com/de/sitemap_pages_1.xml?from=140724535582&to=160297976094",
+    "https://cadomotus.com/de/sitemap_collections_1.xml?from=636039987486&to=651201741086",
+    "https://cadomotus.com/de/sitemap_blogs_1.xml",
+    "https://cadomotus.com/fr/sitemap_products_1.xml?from=9682207441182&to=10119519961374",
+    "https://cadomotus.com/fr/sitemap_pages_1.xml?from=140724535582&to=160297976094",
+    "https://cadomotus.com/fr/sitemap_collections_1.xml?from=636039987486&to=651201741086",
+    "https://cadomotus.com/fr/sitemap_blogs_1.xml",
+]
+
+
 def fetch_all_sitemap_urls() -> list:
-    """Haal alle URLs op uit de sitemap-index (inclusief alle talen)."""
+    """Haal alle URLs op uit de sitemap-index (inclusief alle talen).
+
+    Valt terug op hardcoded sitemaps als de index geblokkeerd is (bijv. Cloudflare).
+    """
     index_xml = ""
+    child_sitemaps = []
+
     try:
         resp = requests.get(SITEMAP_INDEX, headers=HEADERS, timeout=15)
-        index_xml = resp.text
+        log.info("[full_audit] sitemap-index status: %d (eerste 200 chars: %s)",
+                 resp.status_code, resp.text[:200].replace("\n", " "))
+        if resp.status_code == 200 and "<?xml" in resp.text[:50]:
+            index_xml = resp.text
+        else:
+            log.warning("[full_audit] sitemap-index niet leesbaar (status %d of geen XML) — "
+                        "gebruik fallback sitemaps", resp.status_code)
     except Exception as e:
-        log.error("[full_audit] sitemap-index fout: %s", e)
-        return []
+        log.error("[full_audit] sitemap-index fout: %s — gebruik fallback sitemaps", e)
 
-    # Haal alle child-sitemaps op
-    child_sitemaps = LOC_RE.findall(index_xml)
-    # Sla agentic_discovery over (niet nuttig voor SEO-audit)
-    child_sitemaps = [s for s in child_sitemaps if "agentic_discovery" not in s]
+    if index_xml:
+        child_sitemaps = LOC_RE.findall(index_xml)
+        # HTML entity decode &amp; → &
+        child_sitemaps = [s.replace("&amp;", "&") for s in child_sitemaps]
+        # Sla agentic_discovery over (niet nuttig voor SEO-audit)
+        child_sitemaps = [s for s in child_sitemaps if "agentic_discovery" not in s]
+
+    if not child_sitemaps:
+        log.warning("[full_audit] Geen child-sitemaps van index — gebruik %d hardcoded fallback sitemaps",
+                    len(_FALLBACK_SITEMAPS))
+        child_sitemaps = _FALLBACK_SITEMAPS
 
     log.info("[full_audit] %d child-sitemaps gevonden", len(child_sitemaps))
 
@@ -400,7 +445,6 @@ query getAllProductsSEO($cursor: String) {
       id handle title
       descriptionHtml
       seo { title description }
-      onlineStoreUrl
     }
   }
 }
@@ -415,7 +459,6 @@ query getAllCollectionsSEO($cursor: String) {
       descriptionHtml
       seo { title description }
       image { url }
-      onlineStoreUrl
     }
   }
 }
