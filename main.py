@@ -317,6 +317,38 @@ try:
                 })
                 return
 
+            # ── /full/upload  (upload lokaal gegenereerde audit-data) ─
+            if parsed.path == "/full/upload":
+                if not _check_token(qs):
+                    _send_json(self, 401, {"error": "invalid or missing token"})
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", 0))
+                    raw = self.rfile.read(length)
+                    data = json.loads(raw.decode("utf-8"))
+                    audit_path = os.path.join(DATA_DIR, "full_audit.json")
+                    with open(audit_path, "wb") as f:
+                        f.write(raw)
+                    # Update _full_audit_status zodat /full/status correct is
+                    _full_audit_status.update({
+                        "status": "done",
+                        "phase": "done",
+                        "crawled_at": data.get("crawled_at", ""),
+                        "total_issues": data.get("total_issues", 0),
+                        "pages_crawled": data.get("pages_crawled", 0),
+                        "summary_by_type": data.get("summary_by_type", {}),
+                    })
+                    log.info("[full] Upload ontvangen: %d issues, %d paginas",
+                             data.get("total_issues", 0), data.get("pages_crawled", 0))
+                    _send_json(self, 200, {
+                        "ok": True,
+                        "total_issues": data.get("total_issues", 0),
+                        "pages_crawled": data.get("pages_crawled", 0),
+                    })
+                except Exception as e:
+                    _send_json(self, 400, {"error": str(e)})
+                return
+
             _send_json(self, 404, {"error": "Route niet gevonden"})
 
         def log_message(self, *args):
