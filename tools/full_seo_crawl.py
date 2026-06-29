@@ -359,11 +359,17 @@ def _detect_page_type(url: str) -> str:
     return "other"
 
 
+_PAGE_CRAWL_LOCK = None  # lazy init in run_full_seo_audit
+
+
 def analyze_page(url: str) -> list:
     """Crawl één pagina en retourneer alle SEO-issues als lijst van dicts."""
     issues = []
     lang = _detect_lang(url)
     page_type = _detect_page_type(url)
+
+    # 0.5s delay om Cloudflare rate-limiting te voorkomen (sequentieel via 1 worker)
+    time.sleep(0.5)
 
     # curl ipv requests — Cloudflare blokkeert Python requests op basis van TLS fingerprint
     status_code, html_text, final_url = _curl_fetch(url)
@@ -1006,11 +1012,11 @@ def run_full_seo_audit(data_dir: str = "/data", status_ref: dict = None) -> dict
     _upd({"status": "running", "phase": "html_crawl", "pages_crawled": 0,
           "total": total, "issues_found": len(shopify_issues)})
 
-    # Fase 3: HTML-crawl (3 workers — hoger veroorzaakt 429 bij Shopify/Cloudflare)
+    # Fase 3: HTML-crawl (1 worker + 0.5s delay — Cloudflare rate-limit bij >1 concurrent)
     html_issues = []
     crawled = 0
 
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    with ThreadPoolExecutor(max_workers=1) as ex:
         futures = {ex.submit(analyze_page, url): url for url in all_urls}
         for future in as_completed(futures):
             try:
