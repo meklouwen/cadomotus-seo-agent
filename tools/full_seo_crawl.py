@@ -43,16 +43,12 @@ from tools.shopify import _graphql
 log = logging.getLogger("cadomotus-full-seo")
 
 BASE = "https://cadomotus.com"
-# Reguliere Chrome user-agent — Cloudflare blokkeert bekende bot-strings
+# Gebruik herkenbare SEO-bot UA — Cloudflare laat deze door,
+# maar Chrome UA triggert een JS-challenge die requests() niet kan oplossen.
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/125.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "Mozilla/5.0 (compatible; CadomotusSEOBot/2.0; +https://thesystem.nl)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
 }
 
 SITEMAP_INDEX = f"{BASE}/sitemap.xml"
