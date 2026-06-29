@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
@@ -70,12 +71,26 @@ SEVERITY = {
     "hreflang_no_xdefault":       "medium",
     "schema_missing":             "medium",
     "schema_malformed":           "high",
-    "shopify_seo_title_missing":  "high",
-    "shopify_seo_desc_missing":   "high",
-    "shopify_seo_desc_too_long":  "high",
-    "shopify_seo_title_no_brand": "medium",
-    "shopify_no_description":     "medium",
-    "shopify_collection_no_image":"low",
+    "shopify_seo_title_missing":   "high",
+    "shopify_seo_desc_missing":    "high",
+    "shopify_seo_desc_too_long":   "high",
+    "shopify_seo_title_no_brand":  "medium",
+    "shopify_no_description":      "medium",
+    "shopify_collection_no_image": "low",
+    "shopify_article_seo_title_missing":  "high",
+    "shopify_article_seo_desc_missing":   "high",
+    "shopify_article_no_brand":           "medium",
+    "shopify_article_no_image":           "medium",
+    "shopify_article_thin_content":       "medium",
+    "shopify_article_seo_desc_too_long":  "medium",
+    "shopify_page_seo_title_missing":     "high",
+    "shopify_page_seo_desc_missing":      "high",
+    "shopify_page_no_brand":              "medium",
+    "shopify_page_thin_content":          "medium",
+    "shopify_page_seo_desc_too_long":     "medium",
+    "shopify_redirect_chain":             "medium",
+    "shopify_product_few_images":         "medium",
+    "shopify_product_no_tags":            "low",
 }
 
 LABEL = {
@@ -95,12 +110,26 @@ LABEL = {
     "hreflang_no_xdefault":       "Hreflang zonder x-default",
     "schema_missing":             "Geen JSON-LD structured data",
     "schema_malformed":           "JSON-LD structured data ongeldig",
-    "shopify_seo_title_missing":  "[Shopify] SEO-titel niet ingesteld",
-    "shopify_seo_desc_missing":   "[Shopify] SEO-beschrijving niet ingesteld",
-    "shopify_seo_desc_too_long":  "[Shopify] SEO-beschrijving te lang (> 160 tekens)",
-    "shopify_seo_title_no_brand": "[Shopify] Merknaam ontbreekt in SEO-titel",
-    "shopify_no_description":     "[Shopify] Beschrijving ontbreekt",
-    "shopify_collection_no_image":"[Shopify] Collectie heeft geen afbeelding",
+    "shopify_seo_title_missing":   "[Product] SEO-titel niet ingesteld",
+    "shopify_seo_desc_missing":    "[Product] SEO-beschrijving niet ingesteld",
+    "shopify_seo_desc_too_long":   "[Product] SEO-beschrijving te lang (> 160 tekens)",
+    "shopify_seo_title_no_brand":  "[Product] Merknaam ontbreekt in SEO-titel",
+    "shopify_no_description":      "[Product/Collectie] Beschrijving ontbreekt",
+    "shopify_collection_no_image": "[Collectie] Geen afbeelding",
+    "shopify_article_seo_title_missing":  "[Artikel] SEO-titel niet ingesteld",
+    "shopify_article_seo_desc_missing":   "[Artikel] SEO-beschrijving niet ingesteld",
+    "shopify_article_no_brand":           "[Artikel] Merknaam ontbreekt in SEO-titel",
+    "shopify_article_no_image":           "[Artikel] Geen uitgelichte afbeelding",
+    "shopify_article_thin_content":       "[Artikel] Te weinig content (< 300 woorden)",
+    "shopify_article_seo_desc_too_long":  "[Artikel] SEO-beschrijving te lang (> 160 tekens)",
+    "shopify_page_seo_title_missing":     "[Pagina] SEO-titel niet ingesteld",
+    "shopify_page_seo_desc_missing":      "[Pagina] SEO-beschrijving niet ingesteld",
+    "shopify_page_no_brand":              "[Pagina] Merknaam ontbreekt in SEO-titel",
+    "shopify_page_thin_content":          "[Pagina] Te weinig content (< 100 woorden)",
+    "shopify_page_seo_desc_too_long":     "[Pagina] SEO-beschrijving te lang (> 160 tekens)",
+    "shopify_redirect_chain":             "[Redirect] Redirect-keten (dubbele omleiding)",
+    "shopify_product_few_images":         "[Product] Weinig afbeeldingen (< 3)",
+    "shopify_product_no_tags":            "[Product] Geen tags/keywords ingesteld",
 }
 
 
@@ -110,13 +139,47 @@ LABEL = {
 
 LOC_RE = re.compile(r"<loc>([^<]+)</loc>")
 
-def _fetch_urls_from_sitemap(url: str) -> list:
+BOT_UA = "Mozilla/5.0 (compatible; CadomotusSEOBot/2.0; +https://thesystem.nl)"
+
+
+def _curl_fetch(url: str, timeout: int = 8) -> tuple:
+    """Haal een URL op via curl (bypassed Cloudflare TLS fingerprint detectie).
+
+    Returns: (status_code: int, body: str, final_url: str)
+    """
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=15)
-        if resp.status_code == 200:
-            return LOC_RE.findall(resp.text)
+        result = subprocess.run(
+            [
+                "curl", "-s", "-L",
+                "--max-time", str(timeout),
+                "-A", BOT_UA,
+                "-w", "\n__CURL_STATUS__%{http_code}__CURL_URL__%{url_effective}__",
+                url,
+            ],
+            capture_output=True, text=True, timeout=timeout + 2,
+        )
+        raw = result.stdout
+        # Extract status + final URL from the sentinel at the end
+        sentinel_start = raw.rfind("\n__CURL_STATUS__")
+        if sentinel_start == -1:
+            return 0, "", url
+        body = raw[:sentinel_start]
+        meta = raw[sentinel_start + 1:]
+        parts = meta.split("__")
+        # parts: ['__CURL_STATUS', status_code, '__CURL_URL', final_url, '__']
+        status = int(parts[2]) if len(parts) >= 3 else 0
+        final = parts[4] if len(parts) >= 5 else url
+        return status, body, final
     except Exception as e:
-        log.warning("[full_audit] sitemap fout %s: %s", url, e)
+        log.warning("[full_audit] curl fout %s: %s", url, e)
+        return 0, "", url
+
+
+def _fetch_urls_from_sitemap(url: str) -> list:
+    status, body, _ = _curl_fetch(url, timeout=15)
+    if status == 200:
+        return LOC_RE.findall(body)
+    log.warning("[full_audit] sitemap-curl fout %s: status %d", url, status)
     return []
 
 # Fallback sitemaps als cadomotus.com de index-sitemap niet serveert (bijv. Cloudflare-ban)
@@ -148,17 +211,14 @@ def fetch_all_sitemap_urls() -> list:
     index_xml = ""
     child_sitemaps = []
 
-    try:
-        resp = requests.get(SITEMAP_INDEX, headers=HEADERS, timeout=15)
-        log.info("[full_audit] sitemap-index status: %d (eerste 200 chars: %s)",
-                 resp.status_code, resp.text[:200].replace("\n", " "))
-        if resp.status_code == 200 and "<?xml" in resp.text[:50]:
-            index_xml = resp.text
-        else:
-            log.warning("[full_audit] sitemap-index niet leesbaar (status %d of geen XML) — "
-                        "gebruik fallback sitemaps", resp.status_code)
-    except Exception as e:
-        log.error("[full_audit] sitemap-index fout: %s — gebruik fallback sitemaps", e)
+    status, body, _ = _curl_fetch(SITEMAP_INDEX, timeout=15)
+    log.info("[full_audit] sitemap-index status: %d (eerste 200 chars: %s)",
+             status, body[:200].replace("\n", " "))
+    if status == 200 and "<?xml" in body[:50]:
+        index_xml = body
+    else:
+        log.warning("[full_audit] sitemap-index niet leesbaar (status %d of geen XML) — "
+                    "gebruik fallback sitemaps", status)
 
     if index_xml:
         child_sitemaps = LOC_RE.findall(index_xml)
@@ -305,28 +365,32 @@ def analyze_page(url: str) -> list:
     lang = _detect_lang(url)
     page_type = _detect_page_type(url)
 
-    resp = None
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=8, allow_redirects=True)
-    except Exception as e:
+    # curl ipv requests — Cloudflare blokkeert Python requests op basis van TLS fingerprint
+    status_code, html_text, final_url = _curl_fetch(url)
+
+    if status_code == 0:
         return [{
             "type": "http_error", "url": url, "lang": lang, "page_type": page_type,
             "severity": "high",
             "label": "HTTP-fout bij ophalen pagina",
-            "current_value": str(e)[:200],
+            "current_value": "curl fout / timeout",
             "status": "pending",
         }]
 
-    # Retry eenmalig bij 429 (rate limit) — max 5 seconden wachten
-    if resp.status_code == 429:
+    if status_code == 429:
         log.info("[full_audit] 429 op %s — wacht 5s en retry", url)
         time.sleep(5)
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=8, allow_redirects=True)
-        except Exception:
-            return []
-        if resp.status_code == 429:
+        status_code, html_text, final_url = _curl_fetch(url)
+        if status_code in (0, 429):
             return []  # Skip na tweede 429
+
+    # Maak resp-achtige structuur voor de rest van de code
+    class _FakeResp:
+        def __init__(self, s, t, u):
+            self.status_code = s
+            self.text = t
+            self.url = u
+    resp = _FakeResp(status_code, html_text, final_url)
 
     if resp.status_code != 200:
         return [{
@@ -453,6 +517,66 @@ query getAllCollectionsSEO($cursor: String) {
       descriptionHtml
       seo { title description }
       image { url }
+    }
+  }
+}
+"""
+
+_ARTICLES_SEO_QUERY = """
+query getAllArticlesSEO($cursor: String) {
+  articles(first: 50, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id title handle
+      blog { title handle }
+      seo { title description }
+      image { url }
+      contentHtml
+      publishedAt
+      tags
+    }
+  }
+}
+"""
+
+_PAGES_SEO_QUERY = """
+query getAllPagesSEO($cursor: String) {
+  pages(first: 50, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id title handle
+      seo { title description }
+      body
+    }
+  }
+}
+"""
+
+_REDIRECTS_QUERY = """
+query getAllRedirects($cursor: String) {
+  urlRedirects(first: 250, after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id
+      path
+      target
+    }
+  }
+}
+"""
+
+_PRODUCT_IMAGES_COUNT_QUERY = """
+query getProductImageCounts($cursor: String) {
+  products(first: 50, query: "status:active", after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id title handle
+      tags
+      media(first: 50) {
+        nodes {
+          ... on MediaImage { id }
+        }
+      }
     }
   }
 }
@@ -593,6 +717,243 @@ def _shopify_collection_seo_issues() -> list:
     return issues
 
 
+def _count_words(html: str) -> int:
+    text = re.sub(r"<[^>]+>", " ", html or "")
+    return len(text.split())
+
+
+def _shopify_article_seo_issues() -> list:
+    """Blog-artikelen controleren op SEO-velden, afbeelding en content-dikte."""
+    issues = []
+    cursor = None
+
+    while True:
+        res = _graphql(_ARTICLES_SEO_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify articles-query fout: %s", res["error"])
+            break
+
+        articles = res.get("articles", {}) or {}
+        for a in (articles.get("nodes") or []):
+            aid = a.get("id", "")
+            handle = a.get("handle", "")
+            title = a.get("title", "")
+            blog = a.get("blog") or {}
+            blog_handle = blog.get("handle", "")
+            seo = a.get("seo") or {}
+            seo_title = (seo.get("title") or "").strip()
+            seo_desc = (seo.get("description") or "").strip()
+            has_image = bool((a.get("image") or {}).get("url"))
+            word_count = _count_words(a.get("contentHtml") or "")
+            url = f"{BASE}/blogs/{blog_handle}/{handle}"
+
+            def add_art(issue_type: str, current: str = ""):
+                issues.append({
+                    "type": issue_type,
+                    "url": url,
+                    "lang": "en",
+                    "page_type": "article",
+                    "severity": SEVERITY.get(issue_type, "medium"),
+                    "label": LABEL.get(issue_type, issue_type),
+                    "current_value": current[:300],
+                    "shopify_resource_id": aid,
+                    "shopify_handle": handle,
+                    "shopify_title": title,
+                    "status": "pending",
+                })
+
+            if not seo_title:
+                add_art("shopify_article_seo_title_missing", "")
+            else:
+                if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
+                    add_art("shopify_article_no_brand", seo_title)
+
+            if not seo_desc:
+                add_art("shopify_article_seo_desc_missing", "")
+            elif len(seo_desc) > 160:
+                add_art("shopify_article_seo_desc_too_long", seo_desc[:160])
+
+            if not has_image:
+                add_art("shopify_article_no_image", "")
+
+            if word_count < 300:
+                add_art("shopify_article_thin_content", f"{word_count} woorden")
+
+        page_info = articles.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    log.info("[full_audit] Shopify articles: %d issues", len(issues))
+    return issues
+
+
+def _shopify_page_seo_issues() -> list:
+    """Shopify-pagina's controleren op SEO-velden en content-dikte."""
+    issues = []
+    cursor = None
+
+    while True:
+        res = _graphql(_PAGES_SEO_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify pages-query fout: %s", res["error"])
+            break
+
+        pages = res.get("pages", {}) or {}
+        for p in (pages.get("nodes") or []):
+            pid = p.get("id", "")
+            handle = p.get("handle", "")
+            title = p.get("title", "")
+            seo = p.get("seo") or {}
+            seo_title = (seo.get("title") or "").strip()
+            seo_desc = (seo.get("description") or "").strip()
+            word_count = _count_words(p.get("body") or "")
+            url = f"{BASE}/pages/{handle}"
+
+            def add_page(issue_type: str, current: str = ""):
+                issues.append({
+                    "type": issue_type,
+                    "url": url,
+                    "lang": "en",
+                    "page_type": "page",
+                    "severity": SEVERITY.get(issue_type, "medium"),
+                    "label": LABEL.get(issue_type, issue_type),
+                    "current_value": current[:300],
+                    "shopify_resource_id": pid,
+                    "shopify_handle": handle,
+                    "shopify_title": title,
+                    "status": "pending",
+                })
+
+            if not seo_title:
+                add_page("shopify_page_seo_title_missing", "")
+            else:
+                if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
+                    add_page("shopify_page_no_brand", seo_title)
+
+            if not seo_desc:
+                add_page("shopify_page_seo_desc_missing", "")
+            elif len(seo_desc) > 160:
+                add_page("shopify_page_seo_desc_too_long", seo_desc[:160])
+
+            if word_count < 100:
+                add_page("shopify_page_thin_content", f"{word_count} woorden")
+
+        page_info = pages.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    log.info("[full_audit] Shopify pages: %d issues", len(issues))
+    return issues
+
+
+def _shopify_redirect_issues() -> list:
+    """URL-redirects controleren op ketens (A→B→C) en verdachte targets."""
+    issues = []
+    cursor = None
+    all_redirects = []
+
+    while True:
+        res = _graphql(_REDIRECTS_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify redirects-query fout: %s", res["error"])
+            break
+
+        redir = res.get("urlRedirects", {}) or {}
+        all_redirects.extend(redir.get("nodes") or [])
+
+        page_info = redir.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    # Bouw set van bekende redirect-paths voor keten-detectie
+    redirect_paths = {r["path"].rstrip("/") for r in all_redirects}
+
+    for r in all_redirects:
+        path = r.get("path", "")
+        target = r.get("target", "")
+        rid = r.get("id", "")
+        # Keten: target is ook een redirect-from-path
+        target_path = target.rstrip("/")
+        if target_path in redirect_paths or (
+            target_path.startswith(BASE) and
+            target_path[len(BASE):].rstrip("/") in redirect_paths
+        ):
+            issues.append({
+                "type": "shopify_redirect_chain",
+                "url": f"{BASE}{path}",
+                "lang": "en",
+                "page_type": "redirect",
+                "severity": "medium",
+                "label": LABEL["shopify_redirect_chain"],
+                "current_value": f"{path} → {target}",
+                "shopify_resource_id": rid,
+                "shopify_handle": path,
+                "shopify_title": f"Redirect: {path}",
+                "status": "pending",
+            })
+
+    log.info("[full_audit] Shopify redirects: %d issues (van %d redirects)", len(issues), len(all_redirects))
+    return issues
+
+
+def _shopify_product_extra_issues() -> list:
+    """Extra product-checks: weinig afbeeldingen + geen tags."""
+    issues = []
+    cursor = None
+
+    while True:
+        res = _graphql(_PRODUCT_IMAGES_COUNT_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify product-extra fout: %s", res["error"])
+            break
+
+        products = res.get("products", {}) or {}
+        for p in (products.get("nodes") or []):
+            pid = p.get("id", "")
+            handle = p.get("handle", "")
+            title = p.get("title", "")
+            tags = p.get("tags") or []
+            media_nodes = (p.get("media") or {}).get("nodes") or []
+            image_count = len([m for m in media_nodes if m.get("id")])
+            url = f"{BASE}/products/{handle}"
+
+            def add_extra(issue_type: str, current: str = ""):
+                issues.append({
+                    "type": issue_type,
+                    "url": url,
+                    "lang": "en",
+                    "page_type": "product",
+                    "severity": SEVERITY.get(issue_type, "medium"),
+                    "label": LABEL.get(issue_type, issue_type),
+                    "current_value": current[:200],
+                    "shopify_resource_id": pid,
+                    "shopify_handle": handle,
+                    "shopify_title": title,
+                    "status": "pending",
+                })
+
+            if image_count < 3:
+                add_extra("shopify_product_few_images", f"{image_count} afbeelding(en)")
+
+            if not tags:
+                add_extra("shopify_product_no_tags", "")
+
+        page_info = products.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    log.info("[full_audit] Shopify product-extra: %d issues", len(issues))
+    return issues
+
+
 # ─────────────────────────────────────────────────────────────
 # D: Coördinator
 # ─────────────────────────────────────────────────────────────
@@ -609,14 +970,30 @@ def run_full_seo_audit(data_dir: str = "/data", status_ref: dict = None) -> dict
     _upd({"status": "running", "phase": "sitemap", "pages_crawled": 0, "total": 0, "issues_found": 0})
     log.info("[full_audit] === Volledige SEO-audit gestart ===")
 
-    # Fase 1: Shopify API checks (snel)
+    # Fase 1: Shopify API checks (snel — geen crawl vereist)
     _upd({"status": "running", "phase": "shopify_products", "issues_found": 0})
     product_issues = _shopify_product_seo_issues()
 
     _upd({"status": "running", "phase": "shopify_collections", "issues_found": len(product_issues)})
     collection_issues = _shopify_collection_seo_issues()
 
-    shopify_issues = product_issues + collection_issues
+    _upd({"status": "running", "phase": "shopify_articles", "issues_found": len(product_issues) + len(collection_issues)})
+    article_issues = _shopify_article_seo_issues()
+
+    _upd({"status": "running", "phase": "shopify_pages",
+          "issues_found": len(product_issues) + len(collection_issues) + len(article_issues)})
+    page_issues = _shopify_page_seo_issues()
+
+    _upd({"status": "running", "phase": "shopify_redirects",
+          "issues_found": len(product_issues) + len(collection_issues) + len(article_issues) + len(page_issues)})
+    redirect_issues = _shopify_redirect_issues()
+
+    _upd({"status": "running", "phase": "shopify_product_extra",
+          "issues_found": sum(len(x) for x in [product_issues, collection_issues, article_issues, page_issues, redirect_issues])})
+    product_extra_issues = _shopify_product_extra_issues()
+
+    shopify_issues = (product_issues + collection_issues + article_issues +
+                      page_issues + redirect_issues + product_extra_issues)
     log.info("[full_audit] Shopify-issues totaal: %d", len(shopify_issues))
 
     # Fase 2: Sitemap-URLs ophalen
