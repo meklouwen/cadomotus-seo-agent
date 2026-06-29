@@ -264,16 +264,30 @@ def analyze_page(url: str) -> list:
     lang = _detect_lang(url)
     page_type = _detect_page_type(url)
 
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=20, allow_redirects=True)
-    except Exception as e:
-        return [{
-            "type": "http_error", "url": url, "lang": lang, "page_type": page_type,
-            "severity": "high",
-            "label": "HTTP-fout bij ophalen pagina",
-            "current_value": str(e)[:200],
-            "status": "pending",
-        }]
+    resp = None
+    for attempt in range(4):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=25, allow_redirects=True)
+            if resp.status_code == 429:
+                wait = 2 ** attempt
+                log.info("[full_audit] 429 op %s — wacht %ds (poging %d)", url, wait, attempt + 1)
+                time.sleep(wait)
+                resp = None
+                continue
+            break
+        except Exception as e:
+            if attempt == 3:
+                return [{
+                    "type": "http_error", "url": url, "lang": lang, "page_type": page_type,
+                    "severity": "high",
+                    "label": "HTTP-fout bij ophalen pagina",
+                    "current_value": str(e)[:200],
+                    "status": "pending",
+                }]
+            time.sleep(2 ** attempt)
+
+    if resp is None or resp.status_code == 429:
+        return []  # Skip na te veel 429s — niet als fout loggen
 
     if resp.status_code != 200:
         return [{
@@ -576,12 +590,15 @@ def run_full_seo_audit(data_dir: str = "/data", status_ref: dict = None) -> dict
     _upd({"status": "running", "phase": "html_crawl", "pages_crawled": 0,
           "total": total, "issues_found": len(shopify_issues)})
 
-    # Fase 3: HTML-crawl (concurrent, 8 workers)
+    # Fase 3: HTML-crawl (3 workers — hoger veroorzaakt 429 bij Shopify/Cloudflare)
     html_issues = []
     crawled = 0
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {ex.submit(analyze_page, url): url for url in all_urls}
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = {}
+        for url in all_urls:
+            futures[ex.submit(analyze_page, url)] = url
+            time.sleep(0.2)  # spread submissions om burst te voorkomen
         for future in as_completed(futures):
             try:
                 page_issues = future.result()
