@@ -529,9 +529,10 @@ query getAllArticlesSEO($cursor: String) {
     nodes {
       id title handle
       blog { title handle }
-      seo { title description }
+      seoTitle: metafield(namespace: "global", key: "title_tag") { value }
+      seoDesc: metafield(namespace: "global", key: "description_tag") { value }
       image { url }
-      contentHtml
+      body
       publishedAt
       tags
     }
@@ -545,7 +546,8 @@ query getAllPagesSEO($cursor: String) {
     pageInfo { hasNextPage endCursor }
     nodes {
       id title handle
-      seo { title description }
+      seoTitle: metafield(namespace: "global", key: "title_tag") { value }
+      seoDesc: metafield(namespace: "global", key: "description_tag") { value }
       body
     }
   }
@@ -740,11 +742,11 @@ def _shopify_article_seo_issues() -> list:
             title = a.get("title", "")
             blog = a.get("blog") or {}
             blog_handle = blog.get("handle", "")
-            seo = a.get("seo") or {}
-            seo_title = (seo.get("title") or "").strip()
-            seo_desc = (seo.get("description") or "").strip()
+            # SEO via metafields (global.title_tag / global.description_tag)
+            seo_title = ((a.get("seoTitle") or {}).get("value") or "").strip()
+            seo_desc = ((a.get("seoDesc") or {}).get("value") or "").strip()
             has_image = bool((a.get("image") or {}).get("url"))
-            word_count = _count_words(a.get("contentHtml") or "")
+            word_count = _count_words(a.get("body") or "")
             url = f"{BASE}/blogs/{blog_handle}/{handle}"
 
             def add_art(issue_type: str, current: str = ""):
@@ -805,9 +807,9 @@ def _shopify_page_seo_issues() -> list:
             pid = p.get("id", "")
             handle = p.get("handle", "")
             title = p.get("title", "")
-            seo = p.get("seo") or {}
-            seo_title = (seo.get("title") or "").strip()
-            seo_desc = (seo.get("description") or "").strip()
+            # SEO via metafields (global.title_tag / global.description_tag)
+            seo_title = ((p.get("seoTitle") or {}).get("value") or "").strip()
+            seo_desc = ((p.get("seoDesc") or {}).get("value") or "").strip()
             word_count = _count_words(p.get("body") or "")
             url = f"{BASE}/pages/{handle}"
 
