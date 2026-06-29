@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -16,6 +16,47 @@ log = logging.getLogger("cadomotus-agent")
 # (zie .gitignore advies). Als de directory niet kan worden aangemaakt, wordt
 # de save silently overgeslagen — logs blijven dan de enige bron.
 REPORTS_DIR = Path(os.getenv("REPORTS_DIR", str(Path(__file__).resolve().parents[1] / "logs" / "reports")))
+
+# Voorstel-historiek: bijgehouden op fly.io volume (/data) zodat de agent
+# per week weet welke pagina's al zijn voorgesteld.
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+HISTORY_FILE = DATA_DIR / "proposal_history.json"
+HISTORY_COOLDOWN_WEEKS = int(os.getenv("PROPOSAL_COOLDOWN_WEEKS", "4"))
+
+
+def _load_history() -> dict:
+    """Laad voorstel-historiek vanuit /data/proposal_history.json."""
+    try:
+        if HISTORY_FILE.exists():
+            return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.warning("proposal_history laden mislukt: %s", e)
+    return {"proposals": []}
+
+
+def _save_proposal_history(fixes: list, report_date: str) -> None:
+    """Sla voorgestelde URLs op in de historiek na een succesvolle verzending."""
+    try:
+        history = _load_history()
+        now = datetime.now(timezone.utc).isoformat()
+        for fix in fixes:
+            url = fix.get("url", "")
+            field = fix.get("field", "")
+            if url:
+                history["proposals"].append({
+                    "url": url,
+                    "field": field,
+                    "proposed_at": now,
+                    "report_date": report_date,
+                })
+        # Bewaar alleen de laatste 26 weken (½ jaar) — daarna vervalt de historiek
+        cutoff_count = 26 * 25  # max 25 fixes × 26 weken = 650 entries
+        history["proposals"] = history["proposals"][-cutoff_count:]
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        HISTORY_FILE.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
+        log.info("proposal_history opgeslagen: %d entries totaal", len(history["proposals"]))
+    except Exception as e:
+        log.warning("proposal_history opslaan mislukt: %s", e)
 
 N8N_REPORT_URL = os.getenv(
     "N8N_REPORT_URL",
@@ -149,6 +190,26 @@ GMAIL_TOOLS = [
         }
     },
     {
+        "name": "seo_get_proposal_history",
+        "description": (
+            "Haal de historiek op van eerder voorgestelde SEO-fixes. "
+            "Gebruik dit ALTIJD als eerste stap in het wekelijkse rapport — "
+            "pagina's die de afgelopen 4 weken al zijn voorgesteld hebben "
+            "een penaltyscore en worden liefst overgeslagen tenzij er echt "
+            "geen alternatieven zijn. Zo ziet Diederik elke week vers materiaal."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "weeks_back": {
+                    "type": "integer",
+                    "description": "Hoeveel weken terug om te bekijken (default 8)",
+                    "default": 8
+                }
+            }
+        }
+    },
+    {
         "name": "gmail_check_replies",
         "description": (
             "Check op nieuwe replies van Diederik op SEO-rapport threads. "
@@ -260,6 +321,10 @@ def execute_gmail_tool(name: str, input_data: dict) -> str:
             resp_body = resp.json()
         except ValueError:
             resp_body = {"status": resp.status_code}
+
+        # Sla voor-gestelde URLs op in historiek (alleen bij succesvolle verzending).
+        _save_proposal_history(fixes, input_data.get("date", ""))
+
         return json.dumps({
             "sent_to": to_addr,
             "preview": is_preview,
@@ -302,6 +367,64 @@ def execute_gmail_tool(name: str, input_data: dict) -> str:
         else:
             replies = []
         return json.dumps(replies, indent=2)
+
+    elif name == "seo_get_proposal_history":
+        weeks_back = int(input_data.get("weeks_back", 8))
+        history = _load_history()
+        proposals = history.get("proposals", [])
+
+        # Bereken hoe lang geleden elk voorstel was gedaan
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(weeks=weeks_back)
+
+        url_counts: dict = {}
+        url_last_seen: dict = {}
+        url_fields: dict = {}
+
+        for p in proposals:
+            try:
+                proposed_dt = datetime.fromisoformat(p["proposed_at"].replace("Z", "+00:00"))
+            except Exception:
+                continue
+            if proposed_dt < cutoff:
+                continue
+            url = p.get("url", "")
+            field = p.get("field", "")
+            key = f"{url}|{field}"
+            url_counts[key] = url_counts.get(key, 0) + 1
+            if key not in url_last_seen or proposed_dt > url_last_seen[key]:
+                url_last_seen[key] = proposed_dt
+            url_fields[key] = (url, field, p.get("report_date", ""))
+
+        recently_proposed = []
+        cooldown_cutoff = now - timedelta(weeks=HISTORY_COOLDOWN_WEEKS)
+        for key, (url, field, report_date) in url_fields.items():
+            last = url_last_seen[key]
+            weeks_since = (now - last).days // 7
+            in_cooldown = last > cooldown_cutoff
+            recently_proposed.append({
+                "url": url,
+                "field": field,
+                "times_proposed": url_counts[key],
+                "last_proposed": last.strftime("%Y-%m-%d"),
+                "weeks_since_last": weeks_since,
+                "in_cooldown": in_cooldown,
+            })
+
+        # Sorteer: recentste eerst
+        recently_proposed.sort(key=lambda x: x["last_proposed"], reverse=True)
+
+        in_cooldown_count = sum(1 for r in recently_proposed if r["in_cooldown"])
+        return json.dumps({
+            "recently_proposed": recently_proposed,
+            "cooldown_weeks": HISTORY_COOLDOWN_WEEKS,
+            "in_cooldown_count": in_cooldown_count,
+            "note": (
+                f"Pagina's met in_cooldown=true zijn in de afgelopen {HISTORY_COOLDOWN_WEEKS} weken "
+                "al voorgesteld. Sla ze over voor nieuwe fixes — kies andere pagina's. "
+                "Alleen als je de volledige catalogus hebt uitgeput mag je er één terugpakken."
+            ),
+        })
 
     elif name == "gmail_reply_thread":
         payload = {

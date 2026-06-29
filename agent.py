@@ -185,6 +185,9 @@ Als je gmail_send_report aanroept met preview=false zonder goedkeuring: FOUT. Al
 
 Doe het volgende stap voor stap:
 
+0. Roep DIRECT seo_get_proposal_history aan (weeks_back=8). Sla de lijst van
+   in_cooldown=true pagina's op als "cooldown_urls" — dit zijn URL+field combinaties
+   die de afgelopen 4 weken al zijn voorgesteld. Je slaat ze over bij stap 6.
 1. Haal GSC search analytics op voor de afgelopen 7 dagen (vergelijk met de 7 dagen daarvoor).
 2. Haal quick wins op — pagina's met positie 4-15 en lage CTR (max 20).
 3. Haal de nieuwste producten op uit Shopify en check welke geen SEO hebben.
@@ -193,7 +196,13 @@ Doe het volgende stap voor stap:
    - Tot 20 kandidaat-issues PER TAAL (dus potentieel 80 kandidaten totaal).
    - Haal vertalingen op via shopify_get_translations voor NL, DE en FR.
    - Ontbrekende NL/DE/FR meta's zijn kandidaten, net als zwakke EN meta's.
-6. Scoor en selecteer de TOP 20 STERKSTE fixes uit alle ~80 kandidaten.
+6. Scoor en selecteer de TOP 20 STERKSTE fixes — INCLUSIEF COOLDOWN-FILTER:
+   a. Bereken impact score per kandidaat (URL+field combinatie).
+   b. Pas cooldown-penalty toe: als een URL+field in cooldown_urls staat,
+      trek 200 impact-punten af. Zo scoren ze bijna altijd lager dan nieuwe kandidaten.
+   c. Selecteer de top 20 op aangepaste score. Meld in text_summary hoeveel
+      kandidaten overgeslagen zijn vanwege cooldown (bijv. "3 pagina's overgeslagen
+      wegens cooldown: /collections/inline-speed-skating-speed-skates, ...").
 7. Stuur als PREVIEW via gmail_send_report met preview=true.
 
 SELECTIE-STRATEGIE — 20 PAGINA'S × 4 TALEN:
