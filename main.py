@@ -50,10 +50,15 @@ try:
     _trigger_lock = threading.Lock()
     _trigger_running = False
 
-    # Bulk audit state
+    # Bulk audit state (alt-tags + links)
     _audit_lock = threading.Lock()
     _audit_running = False
     _audit_status: dict = {"status": "idle"}
+
+    # Full SEO audit state
+    _full_audit_lock = threading.Lock()
+    _full_audit_running = False
+    _full_audit_status: dict = {"status": "idle"}
 
     def _do_trigger():
         global _trigger_running
@@ -73,6 +78,24 @@ try:
         finally:
             with _trigger_lock:
                 _trigger_running = False
+
+    def _do_full_audit():
+        global _full_audit_running
+        with _full_audit_lock:
+            if _full_audit_running:
+                return
+            _full_audit_running = True
+        try:
+            log.info("[full] Volledige SEO-audit gestart in achtergrond-thread")
+            from tools.full_seo_crawl import run_full_seo_audit
+            run_full_seo_audit(data_dir=DATA_DIR, status_ref=_full_audit_status)
+            log.info("[full] Volledige SEO-audit klaar")
+        except Exception as e:
+            log.exception("[full] FOUT: %s", e)
+            _full_audit_status.update({"status": "error", "error": str(e)})
+        finally:
+            with _full_audit_lock:
+                _full_audit_running = False
 
     def _do_bulk_audit():
         global _audit_running
@@ -180,6 +203,48 @@ try:
             # ── /review/status  (voortgang, geen token vereist) ──────
             if parsed.path == "/review/status":
                 _send_json(self, 200, {**_audit_status, "audit_running": _audit_running})
+                return
+
+            # ── /full/audit  (start volledige SEO-crawl) ─────────────
+            if parsed.path == "/full/audit":
+                if not _check_token(qs):
+                    _send_json(self, 401, {"error": "invalid or missing token"})
+                    return
+                with _full_audit_lock:
+                    if _full_audit_running:
+                        _send_json(self, 409, {"error": "Volledige audit al bezig",
+                            "status": _full_audit_status})
+                        return
+                threading.Thread(target=_do_full_audit, daemon=True).start()
+                _send_json(self, 202, {"triggered": True,
+                    "note": "Volledige SEO-audit gestart (~30-45 min). Poll /full/status."})
+                return
+
+            # ── /full/status  (geen token vereist) ────────────────────
+            if parsed.path == "/full/status":
+                _send_json(self, 200, {**_full_audit_status, "running": _full_audit_running})
+                return
+
+            # ── /full/data  (volledig audit JSON) ─────────────────────
+            if parsed.path == "/full/data":
+                if not _check_token(qs):
+                    _send_json(self, 401, {"error": "invalid or missing token"})
+                    return
+                audit_path = os.path.join(DATA_DIR, "full_audit.json")
+                if not os.path.exists(audit_path):
+                    _send_json(self, 404, {"error": "Nog geen volledige audit beschikbaar. "
+                        "Trigger via GET /full/audit?token=..."})
+                    return
+                try:
+                    with open(audit_path, "rb") as f:
+                        raw = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json; charset=utf-8")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+                except Exception as e:
+                    _send_json(self, 500, {"error": str(e)})
                 return
 
             # ── / health ─────────────────────────────────────────────

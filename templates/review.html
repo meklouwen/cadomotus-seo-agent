@@ -89,10 +89,27 @@
   .badge-410 { background: #fce7f3; color: #be185d; }
   .badge-301 { background: #fef9c3; color: #a16207; }
   .badge-302 { background: #fff7ed; color: #c2410c; }
+  .badge-high { background: #fee2e2; color: #dc2626; }
+  .badge-medium { background: #fef3c7; color: #92400e; }
+  .badge-low { background: #f0fdf4; color: #166534; }
   .link-cell a { font-size: 12px; color: #2563eb; word-break: break-all; text-decoration: none; }
   .link-cell a:hover { text-decoration: underline; }
   .anchor-text { font-size: 11px; color: #71717a; margin-top: 2px; font-style: italic; }
   .found-on { font-size: 11px; color: #52525b; word-break: break-all; }
+  .full-audit-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .filter-select { padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 6px; font-size: 12px; color: #52525b; background: #fff; }
+  .full-stats { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .full-stat-chip { padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .chip-high { background: #fee2e2; color: #dc2626; }
+  .chip-medium { background: #fef3c7; color: #92400e; }
+  .chip-low { background: #f0fdf4; color: #166534; }
+  .chip-total { background: #f4f4f5; color: #18181b; }
+  .issue-url { font-size: 11px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .issue-url:hover { text-decoration: underline; }
+  .issue-value { font-size: 11px; color: #71717a; word-break: break-all; font-style: italic; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lang-chip { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; background: #e4e4e7; color: #52525b; }
+  .scan-progress { background: #f8fafc; border: 1px solid #e4e4e7; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+  .scan-progress p { font-size: 13px; color: #52525b; margin-top: 8px; }
   .redirect-dest a { font-size: 11px; color: #16a34a; word-break: break-all; text-decoration: none; }
   .redirect-dest a:hover { text-decoration: underline; }
 
@@ -197,6 +214,7 @@
   <div class="tab active" data-tab="alt">Alt-tags <span class="tab-badge" id="tab-alt-count">—</span></div>
   <div class="tab" data-tab="dead">Dode links <span class="tab-badge" id="tab-dead-count">—</span></div>
   <div class="tab" data-tab="redirect">Redirects <span class="tab-badge" id="tab-redirect-count">—</span></div>
+  <div class="tab" data-tab="full">Volledige audit <span class="tab-badge" id="tab-full-count">—</span></div>
 </div>
 
 <!-- Content -->
@@ -306,6 +324,70 @@
   </div>
   <button class="apply-btn" id="apply-btn" onclick="applyFixes()">Goedkeuren &amp; uitvoeren →</button>
 </div>
+
+  <!-- FULL AUDIT TAB -->
+  <div id="tab-full" class="tab-content" style="display:none">
+    <div id="full-not-loaded" style="display:none">
+      <div class="scan-progress">
+        <div class="spinner" style="margin:0 auto"></div>
+        <p id="full-scan-msg">Volledige audit laden...</p>
+        <button class="toolbar-btn primary" style="margin-top:12px" onclick="triggerFullAudit()" id="full-start-btn" style="display:none">Volledige audit starten</button>
+      </div>
+    </div>
+
+    <div id="full-loaded" style="display:none">
+      <div class="full-stats" id="full-stats"></div>
+
+      <div class="full-audit-toolbar">
+        <input type="text" class="search-box" id="full-search" placeholder="Zoek op URL of issue..." oninput="fullFilterChange()" style="width:240px">
+        <select class="filter-select" id="full-sev-filter" onchange="fullFilterChange()">
+          <option value="">Alle ernst</option>
+          <option value="high">Hoog</option>
+          <option value="medium">Medium</option>
+          <option value="low">Laag</option>
+        </select>
+        <select class="filter-select" id="full-type-filter" onchange="fullFilterChange()">
+          <option value="">Alle types</option>
+        </select>
+        <select class="filter-select" id="full-lang-filter" onchange="fullFilterChange()">
+          <option value="">Alle talen</option>
+          <option value="en">EN</option>
+          <option value="nl">NL</option>
+          <option value="de">DE</option>
+          <option value="fr">FR</option>
+        </select>
+        <select class="filter-select" id="full-pagetype-filter" onchange="fullFilterChange()">
+          <option value="">Alle paginatypes</option>
+          <option value="product">Product</option>
+          <option value="collection">Collectie</option>
+          <option value="article">Artikel</option>
+          <option value="page">Pagina</option>
+        </select>
+        <span class="spacer"></span>
+        <button class="toolbar-btn primary" onclick="downloadFullCSV()">Download CSV</button>
+        <button class="toolbar-btn" onclick="triggerFullAudit()" id="full-rescan-btn">Opnieuw scannen</button>
+        <span class="page-info" id="full-page-info"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:70px">Ernst</th>
+            <th>Issue</th>
+            <th>Pagina</th>
+            <th style="width:42px">Taal</th>
+            <th style="width:80px">Type</th>
+          </tr></thead>
+          <tbody id="full-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button onclick="fullPrevPage()" id="full-prev">← Vorige</button>
+        <span class="page-num" id="full-page-num"></span>
+        <button onclick="fullNextPage()" id="full-next">Volgende →</button>
+      </div>
+    </div>
+  </div>
 
 <!-- Rescan modal -->
 <div class="overlay" id="rescan-overlay" onclick="closeRescanModal(event)">
@@ -862,6 +944,223 @@ async function loadData() {
       `<div style="color:#dc2626;font-size:15px;text-align:center;padding:40px">${esc(String(err.message))}</div>`;
   }
 }
+
+// ── Full audit ───────────────────────────────────────────────
+let fullData = { issues: [], total_issues: 0, crawled_at: null };
+let fullFiltered = [];
+let fullPage = 0;
+const FULL_PER_PAGE = 50;
+
+async function loadFullAudit() {
+  const notLoaded = document.getElementById('full-not-loaded');
+  const loaded    = document.getElementById('full-loaded');
+  const msg       = document.getElementById('full-scan-msg');
+  const startBtn  = document.getElementById('full-start-btn');
+
+  notLoaded.style.display = 'block';
+  loaded.style.display    = 'none';
+  msg.textContent = 'Controleren of audit beschikbaar is...';
+
+  try {
+    const resp = await fetch('/full/data?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 404) {
+      msg.textContent = 'Nog geen volledige audit beschikbaar.';
+      startBtn.style.display = 'inline-block';
+      return;
+    }
+    if (resp.status === 401) { msg.textContent = 'Geen toegang.'; return; }
+    if (!resp.ok) throw new Error('Status ' + resp.status);
+
+    fullData = await resp.json();
+    renderFullAudit();
+    notLoaded.style.display = 'none';
+    loaded.style.display    = 'block';
+
+    const d = fullData.crawled_at ? new Date(fullData.crawled_at) : null;
+    if (d) document.getElementById('full-rescan-btn').title =
+      'Laatste scan: ' + d.toLocaleDateString('nl-NL');
+
+  } catch (err) {
+    msg.textContent = 'Fout: ' + err.message;
+    startBtn.style.display = 'inline-block';
+  }
+}
+
+function renderFullAudit() {
+  // Stats
+  const s = fullData;
+  const by_sev = s.summary_by_severity || {};
+  document.getElementById('full-stats').innerHTML = `
+    <span class="full-stat-chip chip-total">${s.total_issues || 0} issues totaal</span>
+    <span class="full-stat-chip chip-high">${by_sev.high || 0} hoog</span>
+    <span class="full-stat-chip chip-medium">${by_sev.medium || 0} medium</span>
+    <span class="full-stat-chip chip-low">${by_sev.low || 0} laag</span>
+    <span class="full-stat-chip chip-total">${s.pages_crawled || 0} pagina's gecrawled</span>`;
+
+  // Populate type filter
+  const types = [...new Set((fullData.issues || []).map(i => i.type))].sort();
+  const typeFilter = document.getElementById('full-type-filter');
+  typeFilter.innerHTML = '<option value="">Alle types</option>' +
+    types.map(t => `<option value="${esc(t)}">${esc(t.replace(/_/g,' '))}</option>`).join('');
+
+  document.getElementById('tab-full-count').textContent = s.total_issues || '—';
+  fullFilterChange();
+}
+
+function fullFilterChange() {
+  const q       = (document.getElementById('full-search')?.value || '').toLowerCase().trim();
+  const sev     = document.getElementById('full-sev-filter')?.value || '';
+  const type    = document.getElementById('full-type-filter')?.value || '';
+  const lang    = document.getElementById('full-lang-filter')?.value || '';
+  const pgType  = document.getElementById('full-pagetype-filter')?.value || '';
+
+  fullFiltered = (fullData.issues || []).filter(issue => {
+    if (sev    && issue.severity   !== sev)    return false;
+    if (type   && issue.type       !== type)   return false;
+    if (lang   && issue.lang       !== lang)   return false;
+    if (pgType && issue.page_type  !== pgType) return false;
+    if (q) {
+      const hay = ((issue.url || '') + (issue.label || '') + (issue.type || '') +
+                   (issue.current_value || '') + (issue.shopify_title || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  fullPage = 0;
+  renderFullTable();
+}
+
+function renderFullTable() {
+  const start = fullPage * FULL_PER_PAGE;
+  const slice = fullFiltered.slice(start, start + FULL_PER_PAGE);
+  const total = fullFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / FULL_PER_PAGE));
+  const tbody = document.getElementById('full-tbody');
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Geen resultaten</div>
+      <div class="empty-sub">Pas de filters aan.</div>
+    </div></td></tr>`;
+    document.getElementById('full-page-num').textContent = 'Pagina 1 van 1';
+    document.getElementById('full-page-info').textContent = '0 issues';
+    document.getElementById('full-prev').disabled = true;
+    document.getElementById('full-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(issue => {
+    const sev = issue.severity || 'low';
+    const urlShort = (issue.url || '').replace('https://cadomotus.com', '');
+    const val = issue.current_value || '';
+    const pgTitle = issue.shopify_title ? `<div style="font-size:11px;color:#52525b;margin-top:1px">${esc(issue.shopify_title)}</div>` : '';
+    return `<tr>
+      <td><span class="badge badge-${sev}">${sev}</span></td>
+      <td>
+        <div style="font-size:12px;font-weight:500;color:#18181b">${esc(issue.label || issue.type)}</div>
+        ${val ? `<div class="issue-value" title="${esc(val)}">${esc(val)}</div>` : ''}
+      </td>
+      <td>
+        <a class="issue-url" href="${esc(issue.url || '')}" target="_blank">${esc(urlShort || issue.url || '')}</a>
+        ${pgTitle}
+      </td>
+      <td><span class="lang-chip">${esc(issue.lang || 'en')}</span></td>
+      <td><span style="font-size:11px;color:#71717a">${esc(issue.page_type || '')}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('full-page-num').textContent = `Pagina ${fullPage + 1} van ${pages}`;
+  document.getElementById('full-page-info').textContent = `${total} issues`;
+  document.getElementById('full-prev').disabled = fullPage === 0;
+  document.getElementById('full-next').disabled = fullPage >= pages - 1;
+}
+
+function fullPrevPage() { if (fullPage > 0) { fullPage--; renderFullTable(); } }
+function fullNextPage() {
+  const max = Math.ceil(fullFiltered.length / FULL_PER_PAGE) - 1;
+  if (fullPage < max) { fullPage++; renderFullTable(); }
+}
+
+function downloadFullCSV() {
+  if (!fullFiltered.length) { toast('Geen data om te exporteren.'); return; }
+  let csv = 'Ernst,Type,Issue,URL,Taal,Pagina type,Huidige waarde,Shopify handle\n';
+  fullFiltered.forEach(i => {
+    csv += [i.severity, i.type, i.label, i.url, i.lang, i.page_type,
+            (i.current_value||'').replace(/"/g,"'"), i.shopify_handle||'']
+      .map(v => `"${(v||'').replace(/"/g,"'")}"`)
+      .join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `cadomotus_full_seo_audit.csv`
+  });
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast(`CSV gedownload (${fullFiltered.length} issues).`, 'success');
+}
+
+async function triggerFullAudit() {
+  const btn = document.getElementById('full-start-btn') || document.getElementById('full-rescan-btn');
+  const msg = document.getElementById('full-scan-msg');
+  if (btn) btn.disabled = true;
+
+  document.getElementById('full-not-loaded').style.display = 'block';
+  document.getElementById('full-loaded').style.display = 'none';
+  if (msg) msg.textContent = 'Audit starten...';
+
+  try {
+    const resp = await fetch('/full/audit?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 409) {
+      if (msg) msg.textContent = 'Audit loopt al. Even wachten...';
+    } else if (!resp.ok) {
+      throw new Error('Status ' + resp.status);
+    } else {
+      if (msg) msg.textContent = 'Audit gestart — dit duurt 30-45 minuten. Polling...';
+    }
+
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch('/full/status');
+        const sd = await sr.json();
+        if (sd.status === 'done') {
+          clearInterval(poll);
+          if (msg) msg.textContent = 'Klaar! Resultaten laden...';
+          await loadFullAudit();
+        } else if (sd.status === 'running') {
+          const phaseMap = {
+            shopify_products: 'Shopify products checken...',
+            shopify_collections: 'Shopify collecties checken...',
+            sitemap: 'Sitemap-URLs ophalen...',
+            html_crawl: `Pagina's crawlen (${sd.pages_crawled||0}/${sd.total||'?'}) — ${sd.issues_found||0} issues gevonden...`,
+          };
+          if (msg) msg.textContent = phaseMap[sd.phase] || 'Bezig...';
+        } else if (sd.status === 'error') {
+          clearInterval(poll);
+          if (msg) msg.textContent = 'Fout: ' + (sd.error || 'onbekend');
+          if (btn) btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 10000);
+  } catch (err) {
+    if (msg) msg.textContent = 'Fout bij starten: ' + err.message;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Auto-laad full audit als de tab geselecteerd wordt
+const _origTabHandler = document.querySelectorAll.bind(document);
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.dataset.tab === 'full' && !fullData.total_issues) {
+        loadFullAudit();
+      }
+    });
+  });
+});
 
 loadData();
 </script>
