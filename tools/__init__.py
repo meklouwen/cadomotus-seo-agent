@@ -2,6 +2,7 @@ from tools.gsc import GSC_TOOLS, execute_gsc_tool
 from tools.shopify import SHOPIFY_TOOLS, execute_shopify_tool
 from tools.gmail import GMAIL_TOOLS, execute_gmail_tool
 from tools.pagespeed import PAGESPEED_TOOLS, execute_pagespeed_tool
+import tools.bulk_audit  # noqa: F401  — registreert bulk audit voor HTTP routes
 
 ALL_TOOLS = GSC_TOOLS + SHOPIFY_TOOLS + GMAIL_TOOLS + PAGESPEED_TOOLS
 

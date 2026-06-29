@@ -1,0 +1,37 @@
+app = "cadomotus-seo-agent"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  TZ = "Europe/Amsterdam"
+  MODE = "idle"
+  SHOPIFY_PROXY_URL = "https://maartenklouwen.app.n8n.cloud/webhook/cadomotus-shopify"
+  GOOGLE_SITE_URL = "sc-domain:cadomotus.com"
+  REPORTS_DIR = "/data/logs/reports"
+  DATA_DIR = "/data"
+  PORT = "8080"
+
+[[mounts]]
+  source = "cadomotus_agent_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/"
