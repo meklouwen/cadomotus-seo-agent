@@ -32,14 +32,21 @@ HEADERS = {
 
 LOC_RE = re.compile(r"<loc>(https://cadomotus\.com(?!/(?:fr|de|nl)/)[^<]*)</loc>")
 
+# media connection returns gid://shopify/MediaImage/... IDs (required for fileUpdate mutation).
+# images connection returns deprecated gid://shopify/ProductImage/... IDs (productImageUpdate removed in 2024-04).
 PRODUCT_IMAGES_QUERY = """
-query getProductImages($cursor: String) {
+query getProductMedia($cursor: String) {
   products(first: 50, query: "status:active", after: $cursor) {
     pageInfo { hasNextPage endCursor }
     nodes {
       id title handle
-      images(first: 50) {
-        nodes { id src altText }
+      media(first: 50) {
+        nodes {
+          ... on MediaImage {
+            id
+            image { url altText }
+          }
+        }
       }
     }
   }
@@ -80,18 +87,22 @@ def get_images_missing_alt() -> list:
             product_id = product.get("id", "")
             product_title = product.get("title", "")
             product_handle = product.get("handle", "")
-            images = (product.get("images") or {}).get("nodes", []) or []
+            # media connection returns MediaImage nodes with nested image object
+            media_nodes = (product.get("media") or {}).get("nodes", []) or []
+            # Filter to only MediaImage type (skip Video, ExternalVideo, Model3d)
+            images = [m for m in media_nodes if m.get("id", "").startswith("gid://shopify/MediaImage/")]
 
-            for idx, image in enumerate(images):
-                alt = (image.get("altText") or "").strip()
+            for idx, media in enumerate(images):
+                img = media.get("image") or {}
+                alt = (img.get("altText") or "").strip()
                 if not alt:
                     all_missing.append({
                         "product_id": product_id,
                         "product_title": product_title,
                         "product_handle": product_handle,
                         "product_url": f"{CADOMOTUS_BASE}/products/{product_handle}",
-                        "image_id": image.get("id", ""),
-                        "image_src": image.get("src", ""),
+                        "image_id": media.get("id", ""),   # gid://shopify/MediaImage/...
+                        "image_src": img.get("url", ""),
                         "current_alt": "",
                         "suggested_alt": _suggest_alt(product_title, idx),
                         "image_index": idx,

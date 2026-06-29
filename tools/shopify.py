@@ -723,18 +723,22 @@ def execute_shopify_tool(name: str, input_data: dict) -> str:
 
         def run():
             if DRY_RUN:
-                return {"dry_run": True, "operation": "productImageUpdate",
-                        "would_set_alt": {"product_id": product_id, "image_id": image_id, "alt": alt_text}}
+                return {"dry_run": True, "operation": "fileUpdate",
+                        "would_set_alt": {"image_id": image_id, "alt": alt_text}}
+            # productImageUpdate is removed in Shopify 2024-04+.
+            # fileUpdate accepts gid://shopify/MediaImage/... IDs with an `alt` field.
             mutation = """
-            mutation updateImageAlt($productId: ID!, $image: ImageInput!) {
-              productImageUpdate(productId: $productId, image: $image) {
+            mutation updateMediaAlt($files: [FileUpdateInput!]!) {
+              fileUpdate(files: $files) {
+                files {
+                  ... on MediaImage { id image { altText } }
+                }
                 userErrors { field message }
               }
             }
             """
             return _graphql(mutation, {
-                "productId": product_id,
-                "image": {"id": image_id, "altText": alt_text},
+                "files": [{"id": image_id, "alt": alt_text}],
             })
 
         return _shopify_call("shopify_update_image_alt", run, input_data)
