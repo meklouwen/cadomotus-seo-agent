@@ -3,92 +3,203 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cádomotus SEO Bulk Audit</title>
+<title>Cádomotus — SEO Bulk Audit</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; font-size: 14px; }
-  header { background: #0a0a0a; color: #fff; padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 18px; font-weight: 600; }
-  header .meta { font-size: 12px; color: #888; margin-left: auto; }
-  .summary { background: #fff; border-bottom: 1px solid #e5e5e5; padding: 16px 32px; display: flex; gap: 32px; }
-  .stat { display: flex; flex-direction: column; }
-  .stat-num { font-size: 28px; font-weight: 700; color: #0a0a0a; }
-  .stat-lbl { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f5; color: #1a1a1a; font-size: 14px; }
+
+  /* ── Header ── */
+  header { background: #09090b; color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 20px; }
+  .header-logo { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+  .header-logo span { color: #71717a; font-weight: 400; font-size: 13px; margin-left: 10px; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .crawl-date { font-size: 12px; color: #71717a; }
+  .rescan-btn { padding: 7px 14px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #e4e4e7; font-size: 12px; cursor: pointer; }
+  .rescan-btn:hover { background: #3f3f46; }
+  .rescan-btn:disabled { opacity: .45; cursor: default; }
+
+  /* ── Summary ── */
+  .summary { background: #fff; border-bottom: 1px solid #e4e4e7; padding: 20px 32px; display: flex; gap: 40px; align-items: center; }
+  .stat { display: flex; flex-direction: column; min-width: 90px; }
+  .stat-num { font-size: 30px; font-weight: 700; line-height: 1; }
+  .stat-lbl { font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: .6px; margin-top: 4px; }
   .stat-num.red { color: #dc2626; }
-  .stat-num.orange { color: #ea580c; }
+  .stat-num.amber { color: #d97706; }
   .stat-num.green { color: #16a34a; }
-  .tabs { background: #fff; border-bottom: 1px solid #e5e5e5; padding: 0 32px; display: flex; gap: 0; }
-  .tab { padding: 14px 20px; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 500; color: #666; transition: color .15s; }
-  .tab:hover { color: #0a0a0a; }
-  .tab.active { color: #0a0a0a; border-bottom-color: #0a0a0a; }
-  .content { padding: 24px 32px; }
-  .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-  .toolbar button { padding: 7px 14px; border: 1px solid #e5e5e5; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; color: #444; }
-  .toolbar button:hover { background: #f5f5f5; }
-  .toolbar .spacer { flex: 1; }
-  .page-info { font-size: 13px; color: #666; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-  th { background: #f8f8f8; padding: 11px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e5e5; }
-  td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  .stat-num.neutral { color: #18181b; }
+  .stat-divider { width: 1px; height: 40px; background: #e4e4e7; }
+  .progress-ring-wrap { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .ring-label { font-size: 13px; color: #71717a; }
+  .ring-label strong { color: #18181b; }
+
+  /* ── Tabs ── */
+  .tabs { background: #fff; border-bottom: 1px solid #e4e4e7; padding: 0 32px; display: flex; }
+  .tab { padding: 14px 20px; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 500; color: #71717a; font-size: 13px; transition: color .12s; white-space: nowrap; }
+  .tab:hover { color: #18181b; }
+  .tab.active { color: #18181b; border-bottom-color: #18181b; }
+  .tab-badge { display: inline-block; background: #f4f4f5; border-radius: 99px; padding: 1px 7px; font-size: 11px; font-weight: 600; margin-left: 6px; color: #71717a; }
+  .tab.active .tab-badge { background: #18181b; color: #fff; }
+
+  /* ── Content ── */
+  .content { padding: 24px 32px; min-height: 400px; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar-btn { padding: 6px 13px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #52525b; }
+  .toolbar-btn:hover { background: #f4f4f5; }
+  .toolbar-btn.primary { background: #18181b; color: #fff; border-color: #18181b; }
+  .toolbar-btn.primary:hover { background: #27272a; }
+  .toolbar-btn.danger { border-color: #fca5a5; color: #dc2626; }
+  .toolbar-btn.danger:hover { background: #fef2f2; }
+  .search-box { padding: 6px 12px; border: 1px solid #e4e4e7; border-radius: 6px; font-size: 13px; width: 220px; }
+  .search-box:focus { outline: none; border-color: #18181b; }
+  .spacer { flex: 1; }
+  .page-info { font-size: 12px; color: #71717a; white-space: nowrap; }
+  .filter-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #52525b; cursor: pointer; }
+  .filter-toggle input { cursor: pointer; }
+
+  /* ── Table ── */
+  .table-wrap { background: #fff; border-radius: 8px; border: 1px solid #e4e4e7; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #fafafa; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e4e4e7; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f4f4f5; vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: #fafafa; }
-  .thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 4px; border: 1px solid #e5e5e5; }
-  .thumb-placeholder { width: 48px; height: 48px; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 10px; }
-  .alt-input { width: 100%; padding: 6px 8px; border: 1px solid #e5e5e5; border-radius: 4px; font-size: 13px; }
-  .alt-input:focus { outline: none; border-color: #0a0a0a; }
-  .char-count { font-size: 11px; color: #888; margin-top: 2px; }
-  .char-count.warn { color: #ea580c; }
-  .link-url { font-size: 12px; color: #2563eb; word-break: break-all; }
-  .page-url { font-size: 12px; color: #666; word-break: break-all; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  tr.applied-row td { opacity: .42; }
+  tr:hover:not(.applied-row) td { background: #fafafa; }
+  .thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 5px; border: 1px solid #e4e4e7; display: block; }
+  .thumb-ph { width: 46px; height: 46px; background: #f4f4f5; border-radius: 5px; border: 1px solid #e4e4e7; display: flex; align-items: center; justify-content: center; }
+  .thumb-ph svg { opacity: .3; }
+  .product-title { font-weight: 500; font-size: 13px; }
+  .product-url { font-size: 11px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .product-url:hover { text-decoration: underline; }
+  .img-index { font-size: 11px; color: #a1a1aa; margin-top: 2px; }
+  .alt-wrap { display: flex; flex-direction: column; gap: 3px; }
+  .alt-input { width: 100%; padding: 6px 8px; border: 1px solid #e4e4e7; border-radius: 5px; font-size: 12px; color: #18181b; }
+  .alt-input:focus { outline: none; border-color: #18181b; }
+  .alt-meta { display: flex; align-items: center; gap: 8px; }
+  .char-count { font-size: 11px; color: #a1a1aa; }
+  .char-count.warn { color: #d97706; font-weight: 600; }
+  .char-count.over { color: #dc2626; font-weight: 600; }
+  .reset-btn { font-size: 11px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
+  .reset-btn:hover { text-decoration: underline; }
+  .cb { width: 15px; height: 15px; cursor: pointer; accent-color: #18181b; }
+  .applied-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 99px; background: #dcfce7; color: #16a34a; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 99px; font-size: 11px; font-weight: 600; }
   .badge-404 { background: #fee2e2; color: #dc2626; }
-  .badge-redirect { background: #fef3c7; color: #92400e; }
-  .cb { width: 16px; height: 16px; cursor: pointer; }
-  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
-  .pagination button { padding: 6px 12px; border: 1px solid #e5e5e5; border-radius: 5px; background: #fff; cursor: pointer; font-size: 13px; }
-  .pagination button:hover:not(:disabled) { background: #f5f5f5; }
-  .pagination button:disabled { opacity: 0.4; cursor: default; }
-  .pagination .page-num { font-size: 13px; color: #555; min-width: 80px; text-align: center; }
-  .apply-bar { position: sticky; bottom: 0; background: #fff; border-top: 2px solid #0a0a0a; padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
-  .apply-bar .selected-count { font-size: 14px; color: #555; }
-  .apply-btn { padding: 11px 24px; background: #0a0a0a; color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 600; }
-  .apply-btn:hover { background: #222; }
-  .apply-btn:disabled { background: #666; cursor: default; }
-  .progress-bar { height: 4px; background: #e5e5e5; border-radius: 2px; flex: 1; }
-  .progress-fill { height: 100%; background: #0a0a0a; border-radius: 2px; transition: width .3s; width: 0; }
-  .toast { position: fixed; top: 20px; right: 20px; padding: 14px 20px; background: #0a0a0a; color: #fff; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; z-index: 100; }
+  .badge-410 { background: #fce7f3; color: #be185d; }
+  .badge-301 { background: #fef9c3; color: #a16207; }
+  .badge-302 { background: #fff7ed; color: #c2410c; }
+  .link-cell a { font-size: 12px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .link-cell a:hover { text-decoration: underline; }
+  .anchor-text { font-size: 11px; color: #71717a; margin-top: 2px; font-style: italic; }
+  .found-on { font-size: 11px; color: #52525b; word-break: break-all; }
+  .redirect-dest a { font-size: 11px; color: #16a34a; word-break: break-all; text-decoration: none; }
+  .redirect-dest a:hover { text-decoration: underline; }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .pagination button { padding: 6px 12px; border: 1px solid #e4e4e7; border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; color: #52525b; }
+  .pagination button:hover:not(:disabled) { background: #f4f4f5; }
+  .pagination button:disabled { opacity: .35; cursor: default; }
+  .page-num { font-size: 12px; color: #71717a; min-width: 90px; text-align: center; }
+
+  /* ── Info box ── */
+  .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 7px; padding: 13px 16px; margin-bottom: 16px; font-size: 13px; color: #1e40af; line-height: 1.5; }
+  .info-box strong { color: #1e3a8a; }
+
+  /* ── Apply bar ── */
+  .apply-bar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e4e4e7; padding: 14px 32px; display: flex; align-items: center; gap: 14px; }
+  .apply-counts { display: flex; gap: 14px; }
+  .apply-count-item { font-size: 13px; color: #71717a; }
+  .apply-count-item strong { color: #18181b; }
+  .apply-spacer { flex: 1; }
+  .apply-progress-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .apply-progress-label { font-size: 12px; color: #52525b; }
+  .apply-progress-bar { height: 4px; background: #e4e4e7; border-radius: 2px; }
+  .apply-progress-fill { height: 100%; background: #18181b; border-radius: 2px; transition: width .2s; width: 0; }
+  .apply-btn { padding: 10px 22px; background: #18181b; color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .apply-btn:hover { background: #27272a; }
+  .apply-btn:disabled { background: #a1a1aa; cursor: default; }
+
+  /* ── Toast ── */
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 18px; background: #18181b; color: #fff; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 200; max-width: 340px; }
   .toast.show { opacity: 1; }
   .toast.success { background: #16a34a; }
   .toast.error { background: #dc2626; }
-  #loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 300px; color: #666; }
-  .spinner { width: 32px; height: 32px; border: 3px solid #e5e5e5; border-top-color: #0a0a0a; border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 12px; }
+  .toast.info { background: #2563eb; }
+
+  /* ── Loading ── */
+  #loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; color: #71717a; }
+  .spinner { width: 30px; height: 30px; border: 3px solid #e4e4e7; border-top-color: #18181b; border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 10px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .empty-state { text-align: center; padding: 60px 32px; color: #888; }
-  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+  /* ── Empty state ── */
+  .empty-state { padding: 56px 32px; text-align: center; color: #71717a; }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-title { font-size: 15px; font-weight: 600; color: #18181b; margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── Rescan modal ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 300; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: #fff; border-radius: 10px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: #52525b; margin-bottom: 20px; line-height: 1.5; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-cancel { padding: 8px 16px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; color: #52525b; }
+  .modal-cancel:hover { background: #f4f4f5; }
+  .modal-confirm { padding: 8px 16px; border: none; border-radius: 6px; background: #18181b; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .modal-confirm:hover { background: #27272a; }
+  .rescan-status { font-size: 13px; color: #52525b; margin-top: 12px; text-align: center; display: none; }
 </style>
 </head>
 <body>
 
+<!-- Header -->
 <header>
   <div>
-    <h1>Cádomotus — SEO Bulk Audit</h1>
+    <div class="header-logo">Cádomotus <span>SEO Bulk Audit</span></div>
   </div>
-  <div class="meta" id="crawl-date">Laden...</div>
+  <div class="header-right">
+    <span class="crawl-date" id="crawl-date">Laden...</span>
+    <button class="rescan-btn" onclick="openRescanModal()" id="rescan-btn">Nieuwe scan starten</button>
+  </div>
 </header>
 
+<!-- Summary bar -->
 <div class="summary">
-  <div class="stat"><span class="stat-num red" id="s-alt">—</span><span class="stat-lbl">Alt-tags ontbreekt</span></div>
-  <div class="stat"><span class="stat-num orange" id="s-dead">—</span><span class="stat-lbl">Dode links</span></div>
-  <div class="stat"><span class="stat-num orange" id="s-redirect">—</span><span class="stat-lbl">Redirect-ketens</span></div>
-  <div class="stat"><span class="stat-num green" id="s-applied">0</span><span class="stat-lbl">Al verwerkt</span></div>
+  <div class="stat">
+    <span class="stat-num red" id="s-alt">—</span>
+    <span class="stat-lbl">Alt-tags ontbreekt</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num green" id="s-applied">0</span>
+    <span class="stat-lbl">Al verwerkt</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num neutral" id="s-dead">—</span>
+    <span class="stat-lbl">Dode links</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num neutral" id="s-redirect">—</span>
+    <span class="stat-lbl">Redirects</span>
+  </div>
+  <div class="progress-ring-wrap" id="progress-wrap" style="display:none">
+    <span class="ring-label">Voortgang: <strong id="progress-pct">0%</strong> alt-tags verwerkt</span>
+  </div>
 </div>
 
+<!-- Tabs -->
 <div class="tabs">
-  <div class="tab active" data-tab="alt">Alt-tags (<span id="tab-alt-count">—</span>)</div>
-  <div class="tab" data-tab="dead">Dode links (<span id="tab-dead-count">—</span>)</div>
-  <div class="tab" data-tab="redirect">Redirects (<span id="tab-redirect-count">—</span>)</div>
+  <div class="tab active" data-tab="alt">Alt-tags <span class="tab-badge" id="tab-alt-count">—</span></div>
+  <div class="tab" data-tab="dead">Dode links <span class="tab-badge" id="tab-dead-count">—</span></div>
+  <div class="tab" data-tab="redirect">Redirects <span class="tab-badge" id="tab-redirect-count">—</span></div>
 </div>
 
+<!-- Content -->
 <div class="content">
   <div id="loading">
     <div class="spinner"></div>
@@ -98,20 +209,26 @@
   <!-- ALT TAGS TAB -->
   <div id="tab-alt" class="tab-content" style="display:none">
     <div class="toolbar">
-      <button onclick="selectAll('alt')">Selecteer alles</button>
-      <button onclick="deselectAll('alt')">Deselecteer alles</button>
+      <button class="toolbar-btn" onclick="selectAllFiltered()">Selecteer alles</button>
+      <button class="toolbar-btn" onclick="deselectAll('alt')">Deselecteer alles</button>
+      <input type="text" class="search-box" id="alt-search" placeholder="Zoek op productnaam..." oninput="onSearchChange()">
+      <label class="filter-toggle">
+        <input type="checkbox" id="pending-only" onchange="onFilterChange()"> Toon alleen openstaande
+      </label>
       <span class="spacer"></span>
       <span class="page-info" id="alt-page-info"></span>
     </div>
-    <table>
-      <thead><tr>
-        <th style="width:60px">Foto</th>
-        <th>Product</th>
-        <th style="width:340px">Alt-tekst suggestie</th>
-        <th style="width:40px">✓</th>
-      </tr></thead>
-      <tbody id="alt-tbody"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:58px">Foto</th>
+          <th>Product</th>
+          <th style="width:360px">Alt-tekst <span style="color:#a1a1aa;font-weight:400;text-transform:none;letter-spacing:0">(aanpasbaar)</span></th>
+          <th style="width:46px;text-align:center">Fix</th>
+        </tr></thead>
+        <tbody id="alt-tbody"></tbody>
+      </table>
+    </div>
     <div class="pagination">
       <button onclick="prevPage('alt')" id="alt-prev">← Vorige</button>
       <span class="page-num" id="alt-page-num"></span>
@@ -121,21 +238,25 @@
 
   <!-- DEAD LINKS TAB -->
   <div id="tab-dead" class="tab-content" style="display:none">
+    <div class="info-box">
+      <strong>Deze links werken niet meer (404/410).</strong> Pas ze handmatig aan in Shopify: ga naar <em>Online Store → Navigation</em> voor menu-links, of naar de betreffende pagina/collectie voor interne links. Je kunt de lijst ook downloaden als CSV.
+    </div>
     <div class="toolbar">
-      <button onclick="selectAll('dead')">Selecteer alles</button>
-      <button onclick="deselectAll('dead')">Deselecteer alles</button>
+      <button class="toolbar-btn primary" onclick="downloadCSV('dead')">Downloaden als CSV</button>
+      <button class="toolbar-btn" onclick="copyAllURLs('dead')">Kopieer alle URLs</button>
       <span class="spacer"></span>
       <span class="page-info" id="dead-page-info"></span>
     </div>
-    <table>
-      <thead><tr>
-        <th>Dode link</th>
-        <th>Gevonden op pagina</th>
-        <th style="width:80px">Status</th>
-        <th style="width:40px">✓</th>
-      </tr></thead>
-      <tbody id="dead-tbody"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Dode link</th>
+          <th>Gevonden op pagina</th>
+          <th style="width:90px">HTTP status</th>
+        </tr></thead>
+        <tbody id="dead-tbody"></tbody>
+      </table>
+    </div>
     <div class="pagination">
       <button onclick="prevPage('dead')" id="dead-prev">← Vorige</button>
       <span class="page-num" id="dead-page-num"></span>
@@ -145,21 +266,26 @@
 
   <!-- REDIRECTS TAB -->
   <div id="tab-redirect" class="tab-content" style="display:none">
+    <div class="info-box">
+      <strong>Deze links sturen door naar een andere URL (301/302).</strong> Update de link naar het einddoel zodat er geen overbodige omleiding plaatsvindt. Shopify redirect-regels beheer je via <em>Online Store → Navigation → URL Redirects</em>.
+    </div>
     <div class="toolbar">
-      <button onclick="selectAll('redirect')">Selecteer alles</button>
-      <button onclick="deselectAll('redirect')">Deselecteer alles</button>
+      <button class="toolbar-btn primary" onclick="downloadCSV('redirect')">Downloaden als CSV</button>
+      <button class="toolbar-btn" onclick="copyAllURLs('redirect')">Kopieer alle URLs</button>
       <span class="spacer"></span>
       <span class="page-info" id="redirect-page-info"></span>
     </div>
-    <table>
-      <thead><tr>
-        <th>Link met redirect</th>
-        <th>Gevonden op pagina</th>
-        <th>Stuurt door naar</th>
-        <th style="width:40px">✓</th>
-      </tr></thead>
-      <tbody id="redirect-tbody"></tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Link met redirect</th>
+          <th>Gevonden op pagina</th>
+          <th>Stuurt door naar</th>
+          <th style="width:70px">Status</th>
+        </tr></thead>
+        <tbody id="redirect-tbody"></tbody>
+      </table>
+    </div>
     <div class="pagination">
       <button onclick="prevPage('redirect')" id="redirect-prev">← Vorige</button>
       <span class="page-num" id="redirect-page-num"></span>
@@ -168,12 +294,30 @@
   </div>
 </div>
 
+<!-- Apply bar -->
 <div class="apply-bar">
-  <span class="selected-count" id="selected-count">0 items geselecteerd</span>
-  <div class="progress-bar" id="apply-progress" style="display:none">
-    <div class="progress-fill" id="apply-fill"></div>
+  <div class="apply-counts">
+    <div class="apply-count-item">Alt-tags: <strong id="cnt-alt">0</strong> geselecteerd</div>
+  </div>
+  <div class="apply-spacer"></div>
+  <div class="apply-progress-wrap" id="apply-progress-wrap" style="display:none">
+    <div class="apply-progress-label" id="apply-progress-label">Verwerken...</div>
+    <div class="apply-progress-bar"><div class="apply-progress-fill" id="apply-fill"></div></div>
   </div>
   <button class="apply-btn" id="apply-btn" onclick="applyFixes()">Goedkeuren &amp; uitvoeren →</button>
+</div>
+
+<!-- Rescan modal -->
+<div class="overlay" id="rescan-overlay" onclick="closeRescanModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>Nieuwe scan starten</h2>
+    <p>Dit start een volledige hercrawl van cadomotus.com. De huidige audit-data wordt overschreven. Dit duurt ~15-20 minuten.</p>
+    <div id="rescan-status" class="rescan-status"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel" id="rescan-cancel" onclick="closeRescanModal()">Annuleren</button>
+      <button class="modal-confirm" id="rescan-confirm" onclick="startRescan()">Scan starten</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -181,164 +325,245 @@
 <script>
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const PER_PAGE = 50;
+const BATCH_SIZE = 20;
 
 let data = { missing_alt: [], dead_links: [], redirect_links: [], summary: {} };
+let filteredAlt = [];
+let altSearch = '';
+let pendingOnly = false;
 let state = {
   alt:      { page: 0, selected: new Set() },
-  dead:     { page: 0, selected: new Set() },
-  redirect: { page: 0, selected: new Set() },
+  dead:     { page: 0 },
+  redirect: { page: 0 },
 };
 let appliedCount = 0;
 let activeTab = 'alt';
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Escape helper ────────────────────────────────────────────
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
-function toast(msg, type = '') {
+// ── Toast ────────────────────────────────────────────────────
+function toast(msg, type) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className = 'toast show' + (type ? ' ' + type : '');
-  setTimeout(() => el.classList.remove('show'), 3500);
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
-function updateSelectedCount() {
-  const total = state.alt.selected.size + state.dead.selected.size + state.redirect.selected.size;
-  document.getElementById('selected-count').textContent =
-    total === 0 ? '0 items geselecteerd' : `${total} items geselecteerd`;
+// ── Apply-bar counter ────────────────────────────────────────
+function updateApplyBar() {
+  document.getElementById('cnt-alt').textContent = state.alt.selected.size;
 }
 
-function selectAll(tab) {
-  const items = tab === 'alt' ? data.missing_alt
-              : tab === 'dead' ? data.dead_links
-              : data.redirect_links;
-  items.forEach((_, i) => { if (items[i].status !== 'applied') state[tab].selected.add(i); });
-  renderTab(tab);
-  updateSelectedCount();
+// ── Filter helpers ───────────────────────────────────────────
+function rebuildFilteredAlt() {
+  const q = altSearch.trim().toLowerCase();
+  filteredAlt = data.missing_alt
+    .map((item, origIdx) => ({ item, origIdx }))
+    .filter(({ item }) => {
+      if (pendingOnly && item.status === 'applied') return false;
+      if (q && !item.product_title.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  state.alt.page = 0;
+}
+
+function onSearchChange() {
+  altSearch = document.getElementById('alt-search').value;
+  rebuildFilteredAlt();
+  renderAlt();
+}
+
+function onFilterChange() {
+  pendingOnly = document.getElementById('pending-only').checked;
+  rebuildFilteredAlt();
+  renderAlt();
+}
+
+function selectAllFiltered() {
+  filteredAlt.forEach(({ item, origIdx }) => {
+    if (item.status !== 'applied') state.alt.selected.add(origIdx);
+  });
+  renderAlt();
+  updateApplyBar();
 }
 
 function deselectAll(tab) {
-  state[tab].selected.clear();
-  renderTab(tab);
-  updateSelectedCount();
+  if (tab === 'alt') { state.alt.selected.clear(); renderAlt(); updateApplyBar(); }
 }
 
-function charCountColor(n) { return n > 125 ? 'warn' : ''; }
+// ── Char count ───────────────────────────────────────────────
+function charClass(n) { return n > 125 ? 'over' : n > 110 ? 'warn' : ''; }
 
-// ── Rendering ────────────────────────────────────────────────
-
+// ── Render: Alt-tags ─────────────────────────────────────────
 function renderAlt() {
-  const items = data.missing_alt;
   const page  = state.alt.page;
   const start = page * PER_PAGE;
-  const slice = items.slice(start, start + PER_PAGE);
+  const slice = filteredAlt.slice(start, start + PER_PAGE);
   const tbody = document.getElementById('alt-tbody');
+  const total = filteredAlt.length;
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="icon">✅</div>Geen ontbrekende alt-tags gevonden.</td></tr>';
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">${pendingOnly || altSearch ? 'Geen resultaten gevonden' : 'Geen ontbrekende alt-tags'}</div>
+      <div class="empty-sub">${pendingOnly || altSearch ? 'Pas de filter aan om meer te zien.' : 'Alle productafbeeldingen hebben al een alt-tekst.'}</div>
+    </div></td></tr>`;
+    document.getElementById('alt-page-num').textContent = `Pagina 1 van 1`;
+    document.getElementById('alt-page-info').textContent = `0 items`;
+    document.getElementById('alt-prev').disabled = true;
+    document.getElementById('alt-next').disabled = true;
     return;
   }
 
-  tbody.innerHTML = slice.map((item, i) => {
-    const globalIdx = start + i;
-    const checked   = state.alt.selected.has(globalIdx) ? 'checked' : '';
-    const applied   = item.status === 'applied';
-    const inputVal  = item.suggested_alt.replace(/"/g, '&quot;');
-    const charN     = item.suggested_alt.length;
-    const src       = item.image_src || '';
-    const thumb     = src
-      ? `<img class="thumb" src="${src}" loading="lazy" onerror="this.style.display='none'">`
-      : `<div class="thumb-placeholder">?</div>`;
+  tbody.innerHTML = slice.map(({ item, origIdx }) => {
+    const checked  = state.alt.selected.has(origIdx);
+    const applied  = item.status === 'applied';
+    const altVal   = item.suggested_alt;
+    const charN    = altVal.length;
+    const src      = item.image_src || '';
+    const imgThumb = src
+      ? `<img class="thumb" src="${esc(src)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'thumb-ph\\'><svg width=18 height=18 viewBox=\\'0 0 24 24\\'><rect x=3 y=3 width=18 height=18 rx=2 fill=none stroke=currentColor stroke-width=1.5/><circle cx=8.5 cy=8.5 r=1.5 fill=currentColor/><path d=\\'M21 15l-5-5L5 21\\' stroke=currentColor stroke-width=1.5 fill=none/></svg></div>'">`
+      : `<div class="thumb-ph"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></div>`;
+    const appliedBadge = applied ? `<span class="applied-badge">✓ verwerkt</span>` : '';
 
-    return `<tr style="${applied ? 'opacity:.45' : ''}">
-      <td>${thumb}</td>
+    return `<tr${applied ? ' class="applied-row"' : ''}>
+      <td>${imgThumb}</td>
       <td>
-        <div style="font-weight:500">${esc(item.product_title)}</div>
-        <a class="page-url" href="${esc(item.product_url)}" target="_blank">${esc(item.product_url)}</a>
-        <div style="font-size:11px;color:#aaa;margin-top:2px">Afbeelding ${item.image_index + 1}</div>
+        <div class="product-title">${esc(item.product_title)} ${appliedBadge}</div>
+        <a class="product-url" href="${esc(item.product_url)}" target="_blank">${esc(item.product_url)}</a>
+        <div class="img-index">Afbeelding ${item.image_index + 1} van product</div>
       </td>
       <td>
-        <input class="alt-input" type="text" value="${inputVal}"
-          data-idx="${globalIdx}"
-          oninput="onAltChange(this)"
-          ${applied ? 'disabled' : ''}>
-        <div class="char-count ${charCountColor(charN)}" id="cc-${globalIdx}">${charN}/125 tekens</div>
+        <div class="alt-wrap">
+          <input class="alt-input" type="text" value="${esc(altVal)}"
+            data-orig-idx="${origIdx}"
+            oninput="onAltChange(this)"
+            maxlength="150"
+            ${applied ? 'disabled' : ''}>
+          <div class="alt-meta">
+            <span class="char-count ${charClass(charN)}" id="cc-${origIdx}">${charN}/125 tekens</span>
+            ${!applied ? `<button class="reset-btn" onclick="resetAlt(${origIdx})">Herstel suggestie</button>` : ''}
+          </div>
+        </div>
       </td>
-      <td><input type="checkbox" class="cb" ${checked} ${applied ? 'disabled' : ''}
-          onchange="toggleSelect('alt', ${globalIdx}, this.checked)"></td>
+      <td style="text-align:center">${applied
+        ? `<span style="color:#16a34a;font-size:16px">✓</span>`
+        : `<input type="checkbox" class="cb" ${checked ? 'checked' : ''} onchange="toggleAlt(${origIdx}, this.checked)">`}</td>
     </tr>`;
   }).join('');
 
-  const total = items.length;
-  const pages = Math.ceil(total / PER_PAGE);
   document.getElementById('alt-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
-  document.getElementById('alt-page-info').textContent = `${total} items`;
+  document.getElementById('alt-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
   document.getElementById('alt-prev').disabled = page === 0;
   document.getElementById('alt-next').disabled = page >= pages - 1;
+  updateProgressRing();
 }
 
-function renderDead() {
-  const items = data.dead_links;
-  const page  = state.dead.page;
-  const start = page * PER_PAGE;
-  const slice = items.slice(start, start + PER_PAGE);
-  const tbody = document.getElementById('dead-tbody');
+function onAltChange(input) {
+  const origIdx = parseInt(input.dataset.origIdx);
+  data.missing_alt[origIdx].suggested_alt = input.value;
+  const n = input.value.length;
+  const cc = document.getElementById('cc-' + origIdx);
+  if (cc) { cc.textContent = n + '/125 tekens'; cc.className = 'char-count ' + charClass(n); }
+}
 
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="icon">✅</div>Geen dode links gevonden.</td></tr>';
-    return;
+function resetAlt(origIdx) {
+  const item = data.missing_alt[origIdx];
+  const suggested = buildSuggestion(item.product_title, item.image_index);
+  item.suggested_alt = suggested;
+  renderAlt();
+}
+
+function buildSuggestion(title, idx) {
+  const suffix = ' | Cádomotus';
+  const base   = idx === 0 ? title : `${title} – detail ${idx}`;
+  const full   = base + suffix;
+  if (full.length <= 125) return full;
+  return base.slice(0, 125 - suffix.length) + suffix;
+}
+
+function toggleAlt(origIdx, checked) {
+  if (checked) state.alt.selected.add(origIdx);
+  else state.alt.selected.delete(origIdx);
+  updateApplyBar();
+}
+
+// ── Render: Dead links ───────────────────────────────────────
+function renderDead() {
+  const items  = data.dead_links;
+  const page   = state.dead.page;
+  const start  = page * PER_PAGE;
+  const slice  = items.slice(start, start + PER_PAGE);
+  const tbody  = document.getElementById('dead-tbody');
+  const total  = items.length;
+  const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">Geen dode links gevonden</div>
+      <div class="empty-sub">Alle interne links op cadomotus.com zijn bereikbaar.</div>
+    </div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(item => {
+      const st = item.http_status;
+      const badgeClass = st === 410 ? 'badge-410' : 'badge-404';
+      return `<tr>
+        <td class="link-cell">
+          <a href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
+          ${item.anchor_text ? `<div class="anchor-text">"${esc(item.anchor_text)}"</div>` : ''}
+        </td>
+        <td><div class="found-on">${esc(item.found_on_page)}</div></td>
+        <td><span class="badge ${badgeClass}">${st || '?'}</span></td>
+      </tr>`;
+    }).join('');
   }
 
-  tbody.innerHTML = slice.map((item, i) => {
-    const globalIdx = start + i;
-    const checked   = state.dead.selected.has(globalIdx) ? 'checked' : '';
-    const status    = item.http_status || '?';
-    return `<tr>
-      <td><a class="link-url" href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
-          ${item.anchor_text ? `<div style="font-size:11px;color:#888;margin-top:2px">"${esc(item.anchor_text)}"</div>` : ''}</td>
-      <td><a class="page-url" href="${esc(item.found_on_page)}" target="_blank">${esc(item.found_on_page)}</a></td>
-      <td><span class="badge badge-404">${status}</span></td>
-      <td><input type="checkbox" class="cb" ${checked}
-          onchange="toggleSelect('dead', ${globalIdx}, this.checked)"></td>
-    </tr>`;
-  }).join('');
-
-  const total = items.length;
-  const pages = Math.ceil(total / PER_PAGE);
   document.getElementById('dead-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
-  document.getElementById('dead-page-info').textContent = `${total} items`;
+  document.getElementById('dead-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
   document.getElementById('dead-prev').disabled = page === 0;
   document.getElementById('dead-next').disabled = page >= pages - 1;
 }
 
+// ── Render: Redirects ────────────────────────────────────────
 function renderRedirect() {
-  const items = data.redirect_links;
-  const page  = state.redirect.page;
-  const start = page * PER_PAGE;
-  const slice = items.slice(start, start + PER_PAGE);
-  const tbody = document.getElementById('redirect-tbody');
+  const items  = data.redirect_links;
+  const page   = state.redirect.page;
+  const start  = page * PER_PAGE;
+  const slice  = items.slice(start, start + PER_PAGE);
+  const tbody  = document.getElementById('redirect-tbody');
+  const total  = items.length;
+  const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
 
-  if (!items.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="icon">✅</div>Geen redirect-ketens gevonden.</td></tr>';
-    return;
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">Geen redirect-ketens gevonden</div>
+      <div class="empty-sub">Alle links op cadomotus.com wijzen direct naar het einddoel.</div>
+    </div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(item => {
+      const st = item.http_status;
+      const badgeClass = st === 301 ? 'badge-301' : 'badge-302';
+      return `<tr>
+        <td class="link-cell">
+          <a href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
+          ${item.anchor_text ? `<div class="anchor-text">"${esc(item.anchor_text)}"</div>` : ''}
+        </td>
+        <td><div class="found-on">${esc(item.found_on_page)}</div></td>
+        <td class="redirect-dest"><a href="${esc(item.redirects_to)}" target="_blank">${esc(item.redirects_to)}</a></td>
+        <td><span class="badge ${badgeClass}">${st}</span></td>
+      </tr>`;
+    }).join('');
   }
 
-  tbody.innerHTML = slice.map((item, i) => {
-    const globalIdx = start + i;
-    const checked   = state.redirect.selected.has(globalIdx) ? 'checked' : '';
-    return `<tr>
-      <td><a class="link-url" href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
-          ${item.anchor_text ? `<div style="font-size:11px;color:#888;margin-top:2px">"${esc(item.anchor_text)}"</div>` : ''}</td>
-      <td><a class="page-url" href="${esc(item.found_on_page)}" target="_blank">${esc(item.found_on_page)}</a></td>
-      <td><a class="page-url" href="${esc(item.redirects_to)}" target="_blank">${esc(item.redirects_to)}</a>
-          <span class="badge badge-redirect" style="margin-left:4px">${item.http_status}</span></td>
-      <td><input type="checkbox" class="cb" ${checked}
-          onchange="toggleSelect('redirect', ${globalIdx}, this.checked)"></td>
-    </tr>`;
-  }).join('');
-
-  const total = items.length;
-  const pages = Math.ceil(total / PER_PAGE);
   document.getElementById('redirect-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
-  document.getElementById('redirect-page-info').textContent = `${total} items`;
+  document.getElementById('redirect-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
   document.getElementById('redirect-prev').disabled = page === 0;
   document.getElementById('redirect-next').disabled = page >= pages - 1;
 }
@@ -349,35 +574,76 @@ function renderTab(tab) {
   else renderRedirect();
 }
 
-function esc(str) {
-  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ── Progress ring ────────────────────────────────────────────
+function updateProgressRing() {
+  const total   = data.missing_alt.length;
+  if (!total) return;
+  const applied = data.missing_alt.filter(i => i.status === 'applied').length;
+  const pct     = Math.round((applied / total) * 100);
+  document.getElementById('s-applied').textContent = applied;
+  document.getElementById('progress-pct').textContent = pct + '%';
+  if (applied > 0) document.getElementById('progress-wrap').style.display = 'flex';
 }
 
-// ── Events ───────────────────────────────────────────────────
-
-function onAltChange(input) {
-  const idx = parseInt(input.dataset.idx);
-  data.missing_alt[idx].suggested_alt = input.value;
-  const n = input.value.length;
-  const cc = document.getElementById('cc-' + idx);
-  if (cc) { cc.textContent = n + '/125 tekens'; cc.className = 'char-count ' + charCountColor(n); }
+// ── Pagination ───────────────────────────────────────────────
+function prevPage(tab) {
+  if (tab === 'alt' && state.alt.page > 0) { state.alt.page--; renderAlt(); }
+  else if (tab === 'dead' && state.dead.page > 0) { state.dead.page--; renderDead(); }
+  else if (tab === 'redirect' && state.redirect.page > 0) { state.redirect.page--; renderRedirect(); }
 }
-
-function toggleSelect(tab, idx, checked) {
-  if (checked) state[tab].selected.add(idx);
-  else state[tab].selected.delete(idx);
-  updateSelectedCount();
-}
-
-function prevPage(tab) { if (state[tab].page > 0) { state[tab].page--; renderTab(tab); } }
 function nextPage(tab) {
-  const items = tab === 'alt' ? data.missing_alt : tab === 'dead' ? data.dead_links : data.redirect_links;
-  const maxPage = Math.ceil(items.length / PER_PAGE) - 1;
-  if (state[tab].page < maxPage) { state[tab].page++; renderTab(tab); }
+  if (tab === 'alt') {
+    const max = Math.ceil(filteredAlt.length / PER_PAGE) - 1;
+    if (state.alt.page < max) { state.alt.page++; renderAlt(); }
+  } else if (tab === 'dead') {
+    const max = Math.ceil(data.dead_links.length / PER_PAGE) - 1;
+    if (state.dead.page < max) { state.dead.page++; renderDead(); }
+  } else {
+    const max = Math.ceil(data.redirect_links.length / PER_PAGE) - 1;
+    if (state.redirect.page < max) { state.redirect.page++; renderRedirect(); }
+  }
+}
+
+// ── CSV / Copy ───────────────────────────────────────────────
+function downloadCSV(tab) {
+  const items = tab === 'dead' ? data.dead_links : data.redirect_links;
+  if (!items.length) { toast('Geen data om te exporteren.'); return; }
+
+  let csv = tab === 'dead'
+    ? 'URL,Gevonden op pagina,HTTP status\n'
+    : 'URL,Gevonden op pagina,Stuurt door naar,HTTP status\n';
+
+  items.forEach(item => {
+    if (tab === 'dead') {
+      csv += `"${item.link_url}","${item.found_on_page}",${item.http_status}\n`;
+    } else {
+      csv += `"${item.link_url}","${item.found_on_page}","${item.redirects_to}",${item.http_status}\n`;
+    }
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `cadomotus_${tab === 'dead' ? 'dode_links' : 'redirects'}.csv`
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`CSV gedownload (${items.length} items).`, 'success');
+}
+
+function copyAllURLs(tab) {
+  const items = tab === 'dead' ? data.dead_links : data.redirect_links;
+  if (!items.length) { toast('Geen URLs om te kopiëren.'); return; }
+  const text = items.map(i => i.link_url).join('\n');
+  navigator.clipboard.writeText(text).then(
+    () => toast(`${items.length} URLs gekopieerd.`, 'success'),
+    () => toast('Kopiëren mislukt — probeer handmatig.', 'error')
+  );
 }
 
 // ── Tabs ─────────────────────────────────────────────────────
-
 document.querySelectorAll('.tab').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -388,118 +654,212 @@ document.querySelectorAll('.tab').forEach(el => {
   });
 });
 
-// ── Apply fixes ──────────────────────────────────────────────
-
+// ── Apply fixes (batched) ────────────────────────────────────
 async function applyFixes() {
-  const selectedAlts    = [...state.alt.selected].map(i => ({
-    ...data.missing_alt[i],
-    alt_text: data.missing_alt[i].suggested_alt,
-  }));
-  const selectedDead    = [...state.dead.selected].map(i => data.dead_links[i]);
-  const selectedRedirects = [...state.redirect.selected].map(i => data.redirect_links[i]);
-
-  const total = selectedAlts.length + selectedDead.length + selectedRedirects.length;
-  if (total === 0) { toast('Selecteer eerst minimaal één item.', ''); return; }
+  const selectedIndices = [...state.alt.selected];
+  if (!selectedIndices.length) {
+    toast('Selecteer eerst minimaal één alt-tag om te verwerken.', '');
+    return;
+  }
 
   const btn = document.getElementById('apply-btn');
+  const progressWrap = document.getElementById('apply-progress-wrap');
+  const progressLabel = document.getElementById('apply-progress-label');
+  const fill = document.getElementById('apply-fill');
+
   btn.disabled = true;
   btn.textContent = 'Bezig...';
+  progressWrap.style.display = 'flex';
 
-  const bar = document.getElementById('apply-progress');
-  bar.style.display = 'block';
-  const fill = document.getElementById('apply-fill');
-  fill.style.width = '10%';
+  const total = selectedIndices.length;
+  let applied = 0;
+  let errors  = [];
 
-  try {
-    const resp = await fetch('/review/apply?token=' + encodeURIComponent(TOKEN), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        selected_alts: selectedAlts,
-        selected_dead: selectedDead,
-        selected_redirects: selectedRedirects,
-      }),
-    });
+  // Chunk into batches
+  const chunks = [];
+  for (let i = 0; i < selectedIndices.length; i += BATCH_SIZE) {
+    chunks.push(selectedIndices.slice(i, i + BATCH_SIZE));
+  }
 
-    fill.style.width = '90%';
-    const result = await resp.json();
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    const items = chunk.map(origIdx => ({
+      ...data.missing_alt[origIdx],
+      alt_text: data.missing_alt[origIdx].suggested_alt,
+    }));
 
-    if (!resp.ok) throw new Error(result.error || 'Server error ' + resp.status);
+    const pct = Math.round((applied / total) * 100);
+    progressLabel.textContent = `Verwerkt ${applied} van ${total} alt-tags...`;
+    fill.style.width = pct + '%';
 
-    fill.style.width = '100%';
-    const applied = result.applied || 0;
-    appliedCount += applied;
-    document.getElementById('s-applied').textContent = appliedCount;
+    try {
+      const resp = await fetch('/review/apply?token=' + encodeURIComponent(TOKEN), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected_alts: items }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Server error ' + resp.status);
 
-    // Mark applied items
-    [...state.alt.selected].forEach(i => { data.missing_alt[i].status = 'applied'; });
-    state.alt.selected.clear();
-    state.dead.selected.clear();
-    state.redirect.selected.clear();
+      applied += result.applied || 0;
+      if (result.errors) errors.push(...result.errors);
 
-    renderTab(activeTab);
-    updateSelectedCount();
-    toast(`${applied} alt-tags bijgewerkt in Shopify!`, 'success');
-
-    if (result.errors && result.errors.length) {
-      console.warn('Errors:', result.errors);
-      setTimeout(() => toast(`${result.errors.length} fouten — zie console.`, 'error'), 4000);
+      // Mark applied
+      chunk.forEach(origIdx => {
+        if (!result.errors?.find(e => e.image_id === data.missing_alt[origIdx].image_id)) {
+          data.missing_alt[origIdx].status = 'applied';
+        }
+      });
+    } catch (err) {
+      errors.push({ error: err.message });
     }
-  } catch (err) {
-    toast('Fout: ' + err.message, 'error');
-  } finally {
-    setTimeout(() => { fill.style.width = '0'; bar.style.display = 'none'; }, 1000);
+  }
+
+  // Final state
+  fill.style.width = '100%';
+  progressLabel.textContent = `Klaar — ${applied} van ${total} verwerkt.`;
+  appliedCount += applied;
+  state.alt.selected.clear();
+  rebuildFilteredAlt();
+  renderAlt();
+  updateApplyBar();
+  updateProgressRing();
+
+  toast(
+    `${applied} alt-tags bijgewerkt in Shopify!${errors.length ? ` (${errors.length} fouten — zie console)` : ''}`,
+    errors.length ? 'info' : 'success'
+  );
+  if (errors.length) console.warn('Apply fouten:', errors);
+
+  setTimeout(() => {
+    progressWrap.style.display = 'none';
+    fill.style.width = '0';
+    progressLabel.textContent = 'Verwerken...';
     btn.disabled = false;
     btn.textContent = 'Goedkeuren & uitvoeren →';
+  }, 3000);
+}
+
+// ── Rescan ───────────────────────────────────────────────────
+function openRescanModal() {
+  document.getElementById('rescan-overlay').classList.add('open');
+  document.getElementById('rescan-status').style.display = 'none';
+  document.getElementById('rescan-confirm').style.display = '';
+  document.getElementById('rescan-cancel').textContent = 'Annuleren';
+}
+
+function closeRescanModal(e) {
+  if (!e || e.target === document.getElementById('rescan-overlay')) {
+    document.getElementById('rescan-overlay').classList.remove('open');
+  }
+}
+
+async function startRescan() {
+  const statusEl  = document.getElementById('rescan-status');
+  const confirmEl = document.getElementById('rescan-confirm');
+  const cancelEl  = document.getElementById('rescan-cancel');
+
+  confirmEl.style.display = 'none';
+  statusEl.style.display  = 'block';
+  statusEl.textContent    = 'Scan wordt gestart...';
+
+  try {
+    const resp = await fetch('/review/audit?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 409) {
+      statusEl.textContent = 'Er loopt al een scan. Wacht tot die klaar is.';
+      return;
+    }
+    if (!resp.ok) throw new Error('Status ' + resp.status);
+
+    statusEl.textContent = 'Scan gestart. Dit duurt ~15-20 min. Je kunt dit venster sluiten.';
+    cancelEl.textContent = 'Sluiten';
+    document.getElementById('rescan-btn').disabled = true;
+
+    // Poll status
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch('/review/status');
+        const sd = await sr.json();
+        if (sd.status === 'done') {
+          clearInterval(poll);
+          statusEl.textContent = `Klaar! Pagina wordt herladen...`;
+          setTimeout(() => location.reload(), 1500);
+        } else if (sd.status === 'running') {
+          const phase = sd.phase === 'images' ? 'Shopify images ophalen...'
+                      : sd.phase === 'crawling_pages' ? `Pagina's crawlen (${sd.pages_crawled || 0}/${sd.total || '?'})...`
+                      : sd.phase === 'checking_links' ? 'Links controleren...'
+                      : 'Bezig...';
+          statusEl.textContent = phase;
+        } else if (sd.status === 'error') {
+          clearInterval(poll);
+          statusEl.textContent = 'Scan mislukt: ' + (sd.error || 'onbekende fout');
+        }
+      } catch (_) {}
+    }, 8000);
+  } catch (err) {
+    statusEl.textContent = 'Fout bij starten: ' + err.message;
+    confirmEl.style.display = '';
   }
 }
 
 // ── Load data ────────────────────────────────────────────────
-
 async function loadData() {
   if (!TOKEN) {
     document.getElementById('loading').innerHTML =
-      '<div style="color:#dc2626;font-size:16px">Geen token in de URL. Gebruik de link die je van The System hebt ontvangen.</div>';
+      '<div style="color:#dc2626;font-size:15px;text-align:center;padding:40px">Geen toegangstoken in de URL. Gebruik de link die je van The System hebt ontvangen.</div>';
     return;
   }
 
   try {
     const resp = await fetch('/review/data?token=' + encodeURIComponent(TOKEN));
     if (resp.status === 401) throw new Error('Ongeldige toegangstoken.');
-    if (resp.status === 404) throw new Error('Audit-data nog niet beschikbaar. Trigger eerst de audit via /review/audit.');
+    if (resp.status === 404) throw new Error('Audit-data nog niet beschikbaar. Start eerst een scan via "Nieuwe scan starten".');
     if (!resp.ok) throw new Error('Server error ' + resp.status);
 
     data = await resp.json();
 
-    // Date
-    const crawledAt = data.crawled_at ? new Date(data.crawled_at).toLocaleString('nl-NL') : 'onbekend';
-    document.getElementById('crawl-date').textContent = 'Gecrawled op ' + crawledAt;
+    // Header
+    const d = data.crawled_at ? new Date(data.crawled_at) : null;
+    document.getElementById('crawl-date').textContent = d
+      ? 'Scan van ' + d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
 
-    // Summary
+    // Summary numbers
     const s = data.summary || {};
-    document.getElementById('s-alt').textContent      = s.missing_alt_count  ?? data.missing_alt.length;
-    document.getElementById('s-dead').textContent     = s.dead_links_count   ?? data.dead_links.length;
-    document.getElementById('s-redirect').textContent = s.redirect_count     ?? data.redirect_links.length;
+    const altTotal  = s.missing_alt_count  ?? data.missing_alt.length;
+    const deadTotal = s.dead_links_count   ?? data.dead_links.length;
+    const redirTotal = s.redirect_count    ?? data.redirect_links.length;
 
-    document.getElementById('tab-alt-count').textContent      = data.missing_alt.length;
-    document.getElementById('tab-dead-count').textContent     = data.dead_links.length;
-    document.getElementById('tab-redirect-count').textContent = data.redirect_links.length;
+    document.getElementById('s-alt').textContent      = altTotal;
+    document.getElementById('s-dead').textContent     = deadTotal;
+    document.getElementById('s-redirect').textContent = redirTotal;
 
-    // Count already applied
+    // Tab badges
+    document.getElementById('tab-alt-count').textContent      = altTotal;
+    document.getElementById('tab-dead-count').textContent     = deadTotal;
+    document.getElementById('tab-redirect-count').textContent = redirTotal;
+
+    // Applied count
     appliedCount = data.missing_alt.filter(i => i.status === 'applied').length;
     document.getElementById('s-applied').textContent = appliedCount;
+    if (appliedCount > 0) document.getElementById('progress-wrap').style.display = 'flex';
+    updateProgressRing();
 
-    // Show
+    // Build filter & render
+    rebuildFilteredAlt();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('tab-alt').style.display = 'block';
     renderAlt();
+
     // Auto-select all pending
-    data.missing_alt.forEach((item, i) => { if (item.status !== 'applied') state.alt.selected.add(i); });
-    updateSelectedCount();
+    data.missing_alt.forEach((item, origIdx) => {
+      if (item.status !== 'applied') state.alt.selected.add(origIdx);
+    });
+    updateApplyBar();
 
   } catch (err) {
     document.getElementById('loading').innerHTML =
-      `<div style="color:#dc2626;font-size:16px">${esc(err.message)}</div>`;
+      `<div style="color:#dc2626;font-size:15px;text-align:center;padding:40px">${esc(String(err.message))}</div>`;
   }
 }
 
