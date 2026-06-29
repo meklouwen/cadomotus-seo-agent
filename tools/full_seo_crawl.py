@@ -91,6 +91,18 @@ SEVERITY = {
     "shopify_redirect_chain":             "medium",
     "shopify_product_few_images":         "medium",
     "shopify_product_no_tags":            "low",
+    "shopify_seo_title_too_long":         "medium",
+    "shopify_seo_title_too_short":        "medium",
+    "shopify_collection_seo_title_too_long": "medium",
+    "shopify_collection_seo_title_too_short": "medium",
+    "shopify_image_no_alt":              "high",
+    "shopify_image_generic_alt":         "medium",
+    "shopify_variant_no_sku":            "low",
+    "shopify_article_seo_title_too_long": "medium",
+    "shopify_article_seo_title_too_short": "medium",
+    "shopify_page_seo_title_too_long":   "medium",
+    "shopify_page_seo_title_too_short":  "medium",
+    "shopify_product_no_vendor":         "low",
 }
 
 LABEL = {
@@ -130,6 +142,18 @@ LABEL = {
     "shopify_redirect_chain":             "[Redirect] Redirect-keten (dubbele omleiding)",
     "shopify_product_few_images":         "[Product] Weinig afbeeldingen (< 3)",
     "shopify_product_no_tags":            "[Product] Geen tags/keywords ingesteld",
+    "shopify_seo_title_too_long":         "[Product] SEO-titel te lang (> 60 tekens)",
+    "shopify_seo_title_too_short":        "[Product] SEO-titel te kort (< 30 tekens)",
+    "shopify_collection_seo_title_too_long": "[Collectie] SEO-titel te lang (> 60 tekens)",
+    "shopify_collection_seo_title_too_short": "[Collectie] SEO-titel te kort (< 30 tekens)",
+    "shopify_image_no_alt":              "[Product] Afbeelding zonder alt-tekst",
+    "shopify_image_generic_alt":         "[Product] Generieke alt-tekst op afbeelding",
+    "shopify_variant_no_sku":            "[Variant] Geen SKU ingesteld",
+    "shopify_article_seo_title_too_long": "[Artikel] SEO-titel te lang (> 60 tekens)",
+    "shopify_article_seo_title_too_short": "[Artikel] SEO-titel te kort (< 30 tekens)",
+    "shopify_page_seo_title_too_long":   "[Pagina] SEO-titel te lang (> 60 tekens)",
+    "shopify_page_seo_title_too_short":  "[Pagina] SEO-titel te kort (< 30 tekens)",
+    "shopify_product_no_vendor":         "[Product] Geen leverancier/vendor ingesteld",
 }
 
 
@@ -506,9 +530,40 @@ query getAllProductsSEO($cursor: String) {
   products(first: 50, query: "status:active", after: $cursor) {
     pageInfo { hasNextPage endCursor }
     nodes {
-      id handle title
+      id handle title vendor
       descriptionHtml
       seo { title description }
+    }
+  }
+}
+"""
+
+_PRODUCT_IMAGES_ALT_QUERY = """
+query getProductImagesAlt($cursor: String) {
+  products(first: 50, query: "status:active", after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id handle title
+      images(first: 50) {
+        nodes { id src altText }
+      }
+    }
+  }
+}
+"""
+
+_PRODUCT_VARIANTS_SKU_QUERY = """
+query getProductVariantsSKU($cursor: String) {
+  products(first: 50, query: "status:active", after: $cursor) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      id handle title
+      variants(first: 100) {
+        nodes {
+          id sku
+          selectedOptions { name value }
+        }
+      }
     }
   }
 }
@@ -634,11 +689,17 @@ def _shopify_product_seo_issues() -> list:
                     "status": "pending",
                 })
 
+            vendor = (p.get("vendor") or "").strip()
+
             if not seo_title:
                 add_shopify("shopify_seo_title_missing", "")
             else:
                 if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
                     add_shopify("shopify_seo_title_no_brand", seo_title)
+                if len(seo_title) > 60:
+                    add_shopify("shopify_seo_title_too_long", seo_title)
+                elif len(seo_title) < 30:
+                    add_shopify("shopify_seo_title_too_short", seo_title)
 
             if not seo_desc:
                 add_shopify("shopify_seo_desc_missing", "")
@@ -647,6 +708,9 @@ def _shopify_product_seo_issues() -> list:
 
             if not desc_plain or len(desc_plain) < 50:
                 add_shopify("shopify_no_description", desc_plain[:100])
+
+            if not vendor:
+                add_shopify("shopify_product_no_vendor", "")
 
         page_info = products.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
@@ -703,6 +767,10 @@ def _shopify_collection_seo_issues() -> list:
             else:
                 if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
                     add_col("shopify_seo_title_no_brand", seo_title)
+                if len(seo_title) > 60:
+                    add_col("shopify_collection_seo_title_too_long", seo_title)
+                elif len(seo_title) < 30:
+                    add_col("shopify_collection_seo_title_too_short", seo_title)
 
             if not seo_desc:
                 add_col("shopify_seo_desc_missing", "")
@@ -775,6 +843,10 @@ def _shopify_article_seo_issues() -> list:
             else:
                 if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
                     add_art("shopify_article_no_brand", seo_title)
+                if len(seo_title) > 60:
+                    add_art("shopify_article_seo_title_too_long", seo_title)
+                elif len(seo_title) < 30:
+                    add_art("shopify_article_seo_title_too_short", seo_title)
 
             if not seo_desc:
                 add_art("shopify_article_seo_desc_missing", "")
@@ -839,6 +911,10 @@ def _shopify_page_seo_issues() -> list:
             else:
                 if "cadomotus" not in seo_title.lower() and "cádomotus" not in seo_title.lower():
                     add_page("shopify_page_no_brand", seo_title)
+                if len(seo_title) > 60:
+                    add_page("shopify_page_seo_title_too_long", seo_title)
+                elif len(seo_title) < 30:
+                    add_page("shopify_page_seo_title_too_short", seo_title)
 
             if not seo_desc:
                 add_page("shopify_page_seo_desc_missing", "")
@@ -962,6 +1038,119 @@ def _shopify_product_extra_issues() -> list:
     return issues
 
 
+_GENERIC_ALT_PATTERNS = re.compile(
+    r"^(image|img|photo|afbeelding|foto|product|undefined|null|-|_|\s*)$",
+    re.IGNORECASE
+)
+
+
+def _shopify_image_alt_issues() -> list:
+    """Controleer alle product-afbeeldingen op ontbrekende of generieke alt-tekst."""
+    issues = []
+    cursor = None
+
+    while True:
+        res = _graphql(_PRODUCT_IMAGES_ALT_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify images-query fout: %s", res["error"])
+            break
+
+        products = res.get("products", {}) or {}
+        for p in (products.get("nodes") or []):
+            pid = p.get("id", "")
+            handle = p.get("handle", "")
+            title = p.get("title", "")
+            url = f"{BASE}/products/{handle}"
+            images = (p.get("images") or {}).get("nodes") or []
+
+            for img in images:
+                iid = img.get("id", "")
+                alt = (img.get("altText") or "").strip()
+                src = img.get("src", "")
+
+                def add_img(issue_type: str, current: str = ""):
+                    issues.append({
+                        "type": issue_type,
+                        "url": url,
+                        "lang": "en",
+                        "page_type": "product",
+                        "severity": SEVERITY.get(issue_type, "medium"),
+                        "label": LABEL.get(issue_type, issue_type),
+                        "current_value": current[:200],
+                        "shopify_resource_id": pid,
+                        "shopify_handle": handle,
+                        "shopify_title": title,
+                        "image_id": iid,
+                        "image_src": src[:200],
+                        "status": "pending",
+                    })
+
+                if not alt:
+                    add_img("shopify_image_no_alt", "")
+                elif _GENERIC_ALT_PATTERNS.match(alt):
+                    add_img("shopify_image_generic_alt", alt)
+
+        page_info = products.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    log.info("[full_audit] Shopify afbeelding-alts: %d issues", len(issues))
+    return issues
+
+
+def _shopify_variant_sku_issues() -> list:
+    """Controleer product-varianten op ontbrekende SKU."""
+    issues = []
+    cursor = None
+
+    while True:
+        res = _graphql(_PRODUCT_VARIANTS_SKU_QUERY, {"cursor": cursor})
+        if "error" in res:
+            log.error("[full_audit] Shopify varianten-query fout: %s", res["error"])
+            break
+
+        products = res.get("products", {}) or {}
+        for p in (products.get("nodes") or []):
+            pid = p.get("id", "")
+            handle = p.get("handle", "")
+            title = p.get("title", "")
+            url = f"{BASE}/products/{handle}"
+            variants = (p.get("variants") or {}).get("nodes") or []
+
+            for v in variants:
+                vid = v.get("id", "")
+                sku = (v.get("sku") or "").strip()
+                options = v.get("selectedOptions") or []
+                variant_label = " / ".join(f"{o['name']}: {o['value']}" for o in options)
+
+                if not sku:
+                    issues.append({
+                        "type": "shopify_variant_no_sku",
+                        "url": url,
+                        "lang": "en",
+                        "page_type": "product",
+                        "severity": "low",
+                        "label": LABEL["shopify_variant_no_sku"],
+                        "current_value": variant_label or "standaard",
+                        "shopify_resource_id": pid,
+                        "shopify_handle": handle,
+                        "shopify_title": f"{title} — {variant_label or 'Default'}",
+                        "variant_id": vid,
+                        "status": "pending",
+                    })
+
+        page_info = products.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+        time.sleep(0.3)
+
+    log.info("[full_audit] Shopify varianten-SKU: %d issues", len(issues))
+    return issues
+
+
 # ─────────────────────────────────────────────────────────────
 # D: Coördinator
 # ─────────────────────────────────────────────────────────────
@@ -1000,8 +1189,20 @@ def run_full_seo_audit(data_dir: str = "/data", status_ref: dict = None) -> dict
           "issues_found": sum(len(x) for x in [product_issues, collection_issues, article_issues, page_issues, redirect_issues])})
     product_extra_issues = _shopify_product_extra_issues()
 
+    _upd({"status": "running", "phase": "shopify_image_alts",
+          "issues_found": sum(len(x) for x in [product_issues, collection_issues, article_issues,
+                                                page_issues, redirect_issues, product_extra_issues])})
+    image_alt_issues = _shopify_image_alt_issues()
+
+    _upd({"status": "running", "phase": "shopify_variant_sku",
+          "issues_found": sum(len(x) for x in [product_issues, collection_issues, article_issues,
+                                                page_issues, redirect_issues, product_extra_issues,
+                                                image_alt_issues])})
+    variant_sku_issues = _shopify_variant_sku_issues()
+
     shopify_issues = (product_issues + collection_issues + article_issues +
-                      page_issues + redirect_issues + product_extra_issues)
+                      page_issues + redirect_issues + product_extra_issues +
+                      image_alt_issues + variant_sku_issues)
     log.info("[full_audit] Shopify-issues totaal: %d", len(shopify_issues))
 
     # Fase 2: Sitemap-URLs ophalen
