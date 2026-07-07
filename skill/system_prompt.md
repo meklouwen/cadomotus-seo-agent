@@ -28,17 +28,22 @@ EN is de "source of truth" in Shopify. NL/DE/FR via Translations API.
 ### Wekelijks rapport (vrijdag 07:00)
 - **PREVIEW FIRST**: eerste verzending is ALTIJD een preview naar Maarten (preview=true).
   Pas na Maartens "ok" wordt de echte versie naar Diederik gestuurd (preview=false).
+- **STAP 0 — COOLDOWN CHECK**: roep eerst `seo_get_proposal_history` aan.
+  Pagina's met `in_cooldown=true` (afgelopen 4 weken al voorgesteld) sla je OVER.
+  Zo ziet Diederik elke week nieuwe pagina's, niet steeds dezelfde.
 - GSC week-over-week vergelijking (clicks, impressies, CTR, positie)
 - Quick wins: pagina's met positie 4-15 en CTR < 3%
 - Nieuwe producten zonder SEO-meta
 - PageSpeed check homepage
 - **Selectie**: verzamel een brede kandidatenpool (bestsellers, nieuwste producten,
   collecties, pages), scoor op impact (impressies × CTR-gap + bestseller-bonus +
-  seizoensbonus), selecteer EXACT 20 unieke pagina's met de hoogste impact.
+  seizoensbonus), trek 200 punten af voor cooldown-pagina's,
+  selecteer EXACT 20 unieke pagina's met de hoogste gecorrigeerde score.
 - 1 fix = 1 pagina met `proposed_values` voor 2-4 talen (liefst alle 4). Taalbalans is
   een zachte voorkeur, géén harde eis — impact wint.
 - Check altijd vertalingen via shopify_get_translations — DE en FR worden vaak vergeten
 - Vermeld bij elke fix expliciet de taal (bijv. "Meta description DE ontbreekt")
+- Vermeld in text_summary hoeveel pagina's zijn overgeslagen wegens cooldown
 - Kort, actionable, in het Nederlands
 
 ### Preview vs. productie

@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cádomotus — SEO Bulk Audit</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f4f5; color: #1a1a1a; font-size: 14px; }
+
+  /* ── Header ── */
+  header { background: #09090b; color: #fff; padding: 18px 32px; display: flex; align-items: center; gap: 20px; }
+  .header-logo { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+  .header-logo span { color: #71717a; font-weight: 400; font-size: 13px; margin-left: 10px; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .crawl-date { font-size: 12px; color: #71717a; }
+  .rescan-btn { padding: 7px 14px; background: #27272a; border: 1px solid #3f3f46; border-radius: 6px; color: #e4e4e7; font-size: 12px; cursor: pointer; }
+  .rescan-btn:hover { background: #3f3f46; }
+  .rescan-btn:disabled { opacity: .45; cursor: default; }
+
+  /* ── Summary ── */
+  .summary { background: #fff; border-bottom: 1px solid #e4e4e7; padding: 20px 32px; display: flex; gap: 40px; align-items: center; }
+  .stat { display: flex; flex-direction: column; min-width: 90px; }
+  .stat-num { font-size: 30px; font-weight: 700; line-height: 1; }
+  .stat-lbl { font-size: 11px; color: #71717a; text-transform: uppercase; letter-spacing: .6px; margin-top: 4px; }
+  .stat-num.red { color: #dc2626; }
+  .stat-num.amber { color: #d97706; }
+  .stat-num.green { color: #16a34a; }
+  .stat-num.neutral { color: #18181b; }
+  .stat-divider { width: 1px; height: 40px; background: #e4e4e7; }
+  .progress-ring-wrap { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .ring-label { font-size: 13px; color: #71717a; }
+  .ring-label strong { color: #18181b; }
+
+  /* ── Tabs ── */
+  .tabs { background: #fff; border-bottom: 1px solid #e4e4e7; padding: 0 32px; display: flex; }
+  .tab { padding: 14px 20px; border-bottom: 2px solid transparent; cursor: pointer; font-weight: 500; color: #71717a; font-size: 13px; transition: color .12s; white-space: nowrap; }
+  .tab:hover { color: #18181b; }
+  .tab.active { color: #18181b; border-bottom-color: #18181b; }
+  .tab-badge { display: inline-block; background: #f4f4f5; border-radius: 99px; padding: 1px 7px; font-size: 11px; font-weight: 600; margin-left: 6px; color: #71717a; }
+  .tab.active .tab-badge { background: #18181b; color: #fff; }
+
+  /* ── Content ── */
+  .content { padding: 24px 32px; min-height: 400px; }
+
+  /* ── Toolbar ── */
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar-btn { padding: 6px 13px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #52525b; }
+  .toolbar-btn:hover { background: #f4f4f5; }
+  .toolbar-btn.primary { background: #18181b; color: #fff; border-color: #18181b; }
+  .toolbar-btn.primary:hover { background: #27272a; }
+  .toolbar-btn.danger { border-color: #fca5a5; color: #dc2626; }
+  .toolbar-btn.danger:hover { background: #fef2f2; }
+  .search-box { padding: 6px 12px; border: 1px solid #e4e4e7; border-radius: 6px; font-size: 13px; width: 220px; }
+  .search-box:focus { outline: none; border-color: #18181b; }
+  .spacer { flex: 1; }
+  .page-info { font-size: 12px; color: #71717a; white-space: nowrap; }
+  .filter-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #52525b; cursor: pointer; }
+  .filter-toggle input { cursor: pointer; }
+
+  /* ── Table ── */
+  .table-wrap { background: #fff; border-radius: 8px; border: 1px solid #e4e4e7; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #fafafa; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: #71717a; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #e4e4e7; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f4f4f5; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.applied-row td { opacity: .42; }
+  tr:hover:not(.applied-row) td { background: #fafafa; }
+  .thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 5px; border: 1px solid #e4e4e7; display: block; }
+  .thumb-ph { width: 46px; height: 46px; background: #f4f4f5; border-radius: 5px; border: 1px solid #e4e4e7; display: flex; align-items: center; justify-content: center; }
+  .thumb-ph svg { opacity: .3; }
+  .product-title { font-weight: 500; font-size: 13px; }
+  .product-url { font-size: 11px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .product-url:hover { text-decoration: underline; }
+  .img-index { font-size: 11px; color: #a1a1aa; margin-top: 2px; }
+  .alt-wrap { display: flex; flex-direction: column; gap: 3px; }
+  .alt-input { width: 100%; padding: 6px 8px; border: 1px solid #e4e4e7; border-radius: 5px; font-size: 12px; color: #18181b; }
+  .alt-input:focus { outline: none; border-color: #18181b; }
+  .alt-meta { display: flex; align-items: center; gap: 8px; }
+  .char-count { font-size: 11px; color: #a1a1aa; }
+  .char-count.warn { color: #d97706; font-weight: 600; }
+  .char-count.over { color: #dc2626; font-weight: 600; }
+  .reset-btn { font-size: 11px; color: #2563eb; background: none; border: none; cursor: pointer; padding: 0; }
+  .reset-btn:hover { text-decoration: underline; }
+  .cb { width: 15px; height: 15px; cursor: pointer; accent-color: #18181b; }
+  .applied-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 99px; background: #dcfce7; color: #16a34a; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-404 { background: #fee2e2; color: #dc2626; }
+  .badge-410 { background: #fce7f3; color: #be185d; }
+  .badge-301 { background: #fef9c3; color: #a16207; }
+  .badge-302 { background: #fff7ed; color: #c2410c; }
+  .badge-high { background: #fee2e2; color: #dc2626; }
+  .badge-medium { background: #fef3c7; color: #92400e; }
+  .badge-low { background: #f0fdf4; color: #166534; }
+  .link-cell a { font-size: 12px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .link-cell a:hover { text-decoration: underline; }
+  .anchor-text { font-size: 11px; color: #71717a; margin-top: 2px; font-style: italic; }
+  .found-on { font-size: 11px; color: #52525b; word-break: break-all; }
+  .full-audit-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .filter-select { padding: 6px 10px; border: 1px solid #e4e4e7; border-radius: 6px; font-size: 12px; color: #52525b; background: #fff; }
+  .full-stats { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .full-stat-chip { padding: 6px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .chip-high { background: #fee2e2; color: #dc2626; }
+  .chip-medium { background: #fef3c7; color: #92400e; }
+  .chip-low { background: #f0fdf4; color: #166534; }
+  .chip-total { background: #f4f4f5; color: #18181b; }
+  .issue-url { font-size: 11px; color: #2563eb; word-break: break-all; text-decoration: none; }
+  .issue-url:hover { text-decoration: underline; }
+  .issue-value { font-size: 11px; color: #71717a; word-break: break-all; font-style: italic; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lang-chip { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; background: #e4e4e7; color: #52525b; }
+  .scan-progress { background: #f8fafc; border: 1px solid #e4e4e7; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+  .scan-progress p { font-size: 13px; color: #52525b; margin-top: 8px; }
+  .redirect-dest a { font-size: 11px; color: #16a34a; word-break: break-all; text-decoration: none; }
+  .redirect-dest a:hover { text-decoration: underline; }
+
+  /* ── Pagination ── */
+  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .pagination button { padding: 6px 12px; border: 1px solid #e4e4e7; border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; color: #52525b; }
+  .pagination button:hover:not(:disabled) { background: #f4f4f5; }
+  .pagination button:disabled { opacity: .35; cursor: default; }
+  .page-num { font-size: 12px; color: #71717a; min-width: 90px; text-align: center; }
+
+  /* ── Info box ── */
+  .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 7px; padding: 13px 16px; margin-bottom: 16px; font-size: 13px; color: #1e40af; line-height: 1.5; }
+  .info-box strong { color: #1e3a8a; }
+
+  /* ── Apply bar ── */
+  .apply-bar { position: sticky; bottom: 0; background: #fff; border-top: 1px solid #e4e4e7; padding: 14px 32px; display: flex; align-items: center; gap: 14px; }
+  .apply-counts { display: flex; gap: 14px; }
+  .apply-count-item { font-size: 13px; color: #71717a; }
+  .apply-count-item strong { color: #18181b; }
+  .apply-spacer { flex: 1; }
+  .apply-progress-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .apply-progress-label { font-size: 12px; color: #52525b; }
+  .apply-progress-bar { height: 4px; background: #e4e4e7; border-radius: 2px; }
+  .apply-progress-fill { height: 100%; background: #18181b; border-radius: 2px; transition: width .2s; width: 0; }
+  .apply-btn { padding: 10px 22px; background: #18181b; color: #fff; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .apply-btn:hover { background: #27272a; }
+  .apply-btn:disabled { background: #a1a1aa; cursor: default; }
+
+  /* ── Toast ── */
+  .toast { position: fixed; top: 20px; right: 20px; padding: 12px 18px; background: #18181b; color: #fff; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .25s; z-index: 200; max-width: 340px; }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #16a34a; }
+  .toast.error { background: #dc2626; }
+  .toast.info { background: #2563eb; }
+
+  /* ── Loading ── */
+  #loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 320px; color: #71717a; }
+  .spinner { width: 30px; height: 30px; border: 3px solid #e4e4e7; border-top-color: #18181b; border-radius: 50%; animation: spin .7s linear infinite; margin-bottom: 10px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Empty state ── */
+  .empty-state { padding: 56px 32px; text-align: center; color: #71717a; }
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-title { font-size: 15px; font-weight: 600; color: #18181b; margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── Rescan modal ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 300; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: #fff; border-radius: 10px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .modal p { font-size: 13px; color: #52525b; margin-bottom: 20px; line-height: 1.5; }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-cancel { padding: 8px 16px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; color: #52525b; }
+  .modal-cancel:hover { background: #f4f4f5; }
+  .modal-confirm { padding: 8px 16px; border: none; border-radius: 6px; background: #18181b; color: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .modal-confirm:hover { background: #27272a; }
+  .rescan-status { font-size: 13px; color: #52525b; margin-top: 12px; text-align: center; display: none; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div>
+    <div class="header-logo">Cádomotus <span>SEO Bulk Audit</span></div>
+  </div>
+  <div class="header-right">
+    <span class="crawl-date" id="crawl-date">Laden...</span>
+    <button class="rescan-btn" onclick="openRescanModal()" id="rescan-btn">Nieuwe scan starten</button>
+  </div>
+</header>
+
+<!-- Summary bar -->
+<div class="summary">
+  <div class="stat">
+    <span class="stat-num red" id="s-alt">—</span>
+    <span class="stat-lbl">Alt-tags ontbreekt</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num green" id="s-applied">0</span>
+    <span class="stat-lbl">Al verwerkt</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num neutral" id="s-dead">—</span>
+    <span class="stat-lbl">Dode links</span>
+  </div>
+  <div class="stat-divider"></div>
+  <div class="stat">
+    <span class="stat-num neutral" id="s-redirect">—</span>
+    <span class="stat-lbl">Redirects</span>
+  </div>
+  <div class="progress-ring-wrap" id="progress-wrap" style="display:none">
+    <span class="ring-label">Voortgang: <strong id="progress-pct">0%</strong> alt-tags verwerkt</span>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="alt">Alt-tags <span class="tab-badge" id="tab-alt-count">—</span></div>
+  <div class="tab" data-tab="dead">Dode links <span class="tab-badge" id="tab-dead-count">—</span></div>
+  <div class="tab" data-tab="redirect">Redirects <span class="tab-badge" id="tab-redirect-count">—</span></div>
+  <div class="tab" data-tab="full">Volledige audit <span class="tab-badge" id="tab-full-count">—</span></div>
+</div>
+
+<!-- Content -->
+<div class="content">
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>Audit-data laden...</div>
+  </div>
+
+  <!-- ALT TAGS TAB -->
+  <div id="tab-alt" class="tab-content" style="display:none">
+    <div class="toolbar">
+      <button class="toolbar-btn" onclick="selectAllFiltered()">Selecteer alles</button>
+      <button class="toolbar-btn" onclick="deselectAll('alt')">Deselecteer alles</button>
+      <input type="text" class="search-box" id="alt-search" placeholder="Zoek op productnaam..." oninput="onSearchChange()">
+      <label class="filter-toggle">
+        <input type="checkbox" id="pending-only" onchange="onFilterChange()"> Toon alleen openstaande
+      </label>
+      <span class="spacer"></span>
+      <span class="page-info" id="alt-page-info"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:58px">Foto</th>
+          <th>Product</th>
+          <th style="width:360px">Alt-tekst <span style="color:#a1a1aa;font-weight:400;text-transform:none;letter-spacing:0">(aanpasbaar)</span></th>
+          <th style="width:46px;text-align:center">Fix</th>
+        </tr></thead>
+        <tbody id="alt-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <button onclick="prevPage('alt')" id="alt-prev">← Vorige</button>
+      <span class="page-num" id="alt-page-num"></span>
+      <button onclick="nextPage('alt')" id="alt-next">Volgende →</button>
+    </div>
+  </div>
+
+  <!-- DEAD LINKS TAB -->
+  <div id="tab-dead" class="tab-content" style="display:none">
+    <div class="info-box">
+      <strong>Deze links werken niet meer (404/410).</strong> Pas ze handmatig aan in Shopify: ga naar <em>Online Store → Navigation</em> voor menu-links, of naar de betreffende pagina/collectie voor interne links. Je kunt de lijst ook downloaden als CSV.
+    </div>
+    <div class="toolbar">
+      <button class="toolbar-btn primary" onclick="downloadCSV('dead')">Downloaden als CSV</button>
+      <button class="toolbar-btn" onclick="copyAllURLs('dead')">Kopieer alle URLs</button>
+      <span class="spacer"></span>
+      <span class="page-info" id="dead-page-info"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Dode link</th>
+          <th>Gevonden op pagina</th>
+          <th style="width:90px">HTTP status</th>
+        </tr></thead>
+        <tbody id="dead-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <button onclick="prevPage('dead')" id="dead-prev">← Vorige</button>
+      <span class="page-num" id="dead-page-num"></span>
+      <button onclick="nextPage('dead')" id="dead-next">Volgende →</button>
+    </div>
+  </div>
+
+  <!-- REDIRECTS TAB -->
+  <div id="tab-redirect" class="tab-content" style="display:none">
+    <div class="info-box">
+      <strong>Deze links sturen door naar een andere URL (301/302).</strong> Update de link naar het einddoel zodat er geen overbodige omleiding plaatsvindt. Shopify redirect-regels beheer je via <em>Online Store → Navigation → URL Redirects</em>.
+    </div>
+    <div class="toolbar">
+      <button class="toolbar-btn primary" onclick="downloadCSV('redirect')">Downloaden als CSV</button>
+      <button class="toolbar-btn" onclick="copyAllURLs('redirect')">Kopieer alle URLs</button>
+      <span class="spacer"></span>
+      <span class="page-info" id="redirect-page-info"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Link met redirect</th>
+          <th>Gevonden op pagina</th>
+          <th>Stuurt door naar</th>
+          <th style="width:70px">Status</th>
+        </tr></thead>
+        <tbody id="redirect-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <button onclick="prevPage('redirect')" id="redirect-prev">← Vorige</button>
+      <span class="page-num" id="redirect-page-num"></span>
+      <button onclick="nextPage('redirect')" id="redirect-next">Volgende →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply bar -->
+<div class="apply-bar">
+  <div class="apply-counts">
+    <div class="apply-count-item">Alt-tags: <strong id="cnt-alt">0</strong> geselecteerd</div>
+  </div>
+  <div class="apply-spacer"></div>
+  <div class="apply-progress-wrap" id="apply-progress-wrap" style="display:none">
+    <div class="apply-progress-label" id="apply-progress-label">Verwerken...</div>
+    <div class="apply-progress-bar"><div class="apply-progress-fill" id="apply-fill"></div></div>
+  </div>
+  <button class="apply-btn" id="apply-btn" onclick="applyFixes()">Goedkeuren &amp; uitvoeren →</button>
+</div>
+
+  <!-- FULL AUDIT TAB -->
+  <div id="tab-full" class="tab-content" style="display:none">
+    <div id="full-not-loaded" style="display:none">
+      <div class="scan-progress">
+        <div class="spinner" style="margin:0 auto"></div>
+        <p id="full-scan-msg">Volledige audit laden...</p>
+        <button class="toolbar-btn primary" style="margin-top:12px" onclick="triggerFullAudit()" id="full-start-btn" style="display:none">Volledige audit starten</button>
+      </div>
+    </div>
+
+    <div id="full-loaded" style="display:none">
+      <div class="full-stats" id="full-stats"></div>
+
+      <div class="full-audit-toolbar">
+        <input type="text" class="search-box" id="full-search" placeholder="Zoek op URL of issue..." oninput="fullFilterChange()" style="width:240px">
+        <select class="filter-select" id="full-sev-filter" onchange="fullFilterChange()">
+          <option value="">Alle ernst</option>
+          <option value="high">Hoog</option>
+          <option value="medium">Medium</option>
+          <option value="low">Laag</option>
+        </select>
+        <select class="filter-select" id="full-type-filter" onchange="fullFilterChange()">
+          <option value="">Alle types</option>
+        </select>
+        <select class="filter-select" id="full-lang-filter" onchange="fullFilterChange()">
+          <option value="">Alle talen</option>
+          <option value="en">EN</option>
+          <option value="nl">NL</option>
+          <option value="de">DE</option>
+          <option value="fr">FR</option>
+        </select>
+        <select class="filter-select" id="full-pagetype-filter" onchange="fullFilterChange()">
+          <option value="">Alle paginatypes</option>
+          <option value="product">Product</option>
+          <option value="collection">Collectie</option>
+          <option value="article">Artikel</option>
+          <option value="page">Pagina</option>
+        </select>
+        <span class="spacer"></span>
+        <button class="toolbar-btn primary" onclick="downloadFullCSV()">Download CSV</button>
+        <button class="toolbar-btn" onclick="triggerFullAudit()" id="full-rescan-btn">Opnieuw scannen</button>
+        <span class="page-info" id="full-page-info"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:70px">Ernst</th>
+            <th>Issue</th>
+            <th>Pagina</th>
+            <th style="width:42px">Taal</th>
+            <th style="width:80px">Type</th>
+          </tr></thead>
+          <tbody id="full-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button onclick="fullPrevPage()" id="full-prev">← Vorige</button>
+        <span class="page-num" id="full-page-num"></span>
+        <button onclick="fullNextPage()" id="full-next">Volgende →</button>
+      </div>
+    </div>
+  </div>
+
+<!-- Rescan modal -->
+<div class="overlay" id="rescan-overlay" onclick="closeRescanModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>Nieuwe scan starten</h2>
+    <p>Dit start een volledige hercrawl van cadomotus.com. De huidige audit-data wordt overschreven. Dit duurt ~15-20 minuten.</p>
+    <div id="rescan-status" class="rescan-status"></div>
+    <div class="modal-footer">
+      <button class="modal-cancel" id="rescan-cancel" onclick="closeRescanModal()">Annuleren</button>
+      <button class="modal-confirm" id="rescan-confirm" onclick="startRescan()">Scan starten</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const PER_PAGE = 50;
+const BATCH_SIZE = 20;
+
+let data = { missing_alt: [], dead_links: [], redirect_links: [], summary: {} };
+let filteredAlt = [];
+let altSearch = '';
+let pendingOnly = false;
+let state = {
+  alt:      { page: 0, selected: new Set() },
+  dead:     { page: 0 },
+  redirect: { page: 0 },
+};
+let appliedCount = 0;
+let activeTab = 'alt';
+
+// ── Escape helper ────────────────────────────────────────────
+function esc(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Toast ────────────────────────────────────────────────────
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── Apply-bar counter ────────────────────────────────────────
+function updateApplyBar() {
+  document.getElementById('cnt-alt').textContent = state.alt.selected.size;
+}
+
+// ── Filter helpers ───────────────────────────────────────────
+function rebuildFilteredAlt() {
+  const q = altSearch.trim().toLowerCase();
+  filteredAlt = data.missing_alt
+    .map((item, origIdx) => ({ item, origIdx }))
+    .filter(({ item }) => {
+      if (pendingOnly && item.status === 'applied') return false;
+      if (q && !item.product_title.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  state.alt.page = 0;
+}
+
+function onSearchChange() {
+  altSearch = document.getElementById('alt-search').value;
+  rebuildFilteredAlt();
+  renderAlt();
+}
+
+function onFilterChange() {
+  pendingOnly = document.getElementById('pending-only').checked;
+  rebuildFilteredAlt();
+  renderAlt();
+}
+
+function selectAllFiltered() {
+  filteredAlt.forEach(({ item, origIdx }) => {
+    if (item.status !== 'applied') state.alt.selected.add(origIdx);
+  });
+  renderAlt();
+  updateApplyBar();
+}
+
+function deselectAll(tab) {
+  if (tab === 'alt') { state.alt.selected.clear(); renderAlt(); updateApplyBar(); }
+}
+
+// ── Char count ───────────────────────────────────────────────
+function charClass(n) { return n > 125 ? 'over' : n > 110 ? 'warn' : ''; }
+
+// ── Render: Alt-tags ─────────────────────────────────────────
+function renderAlt() {
+  const page  = state.alt.page;
+  const start = page * PER_PAGE;
+  const slice = filteredAlt.slice(start, start + PER_PAGE);
+  const tbody = document.getElementById('alt-tbody');
+  const total = filteredAlt.length;
+  const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">${pendingOnly || altSearch ? 'Geen resultaten gevonden' : 'Geen ontbrekende alt-tags'}</div>
+      <div class="empty-sub">${pendingOnly || altSearch ? 'Pas de filter aan om meer te zien.' : 'Alle productafbeeldingen hebben al een alt-tekst.'}</div>
+    </div></td></tr>`;
+    document.getElementById('alt-page-num').textContent = `Pagina 1 van 1`;
+    document.getElementById('alt-page-info').textContent = `0 items`;
+    document.getElementById('alt-prev').disabled = true;
+    document.getElementById('alt-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(({ item, origIdx }) => {
+    const checked  = state.alt.selected.has(origIdx);
+    const applied  = item.status === 'applied';
+    const altVal   = item.suggested_alt;
+    const charN    = altVal.length;
+    const src      = item.image_src || '';
+    const imgThumb = src
+      ? `<img class="thumb" src="${esc(src)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'thumb-ph\\'><svg width=18 height=18 viewBox=\\'0 0 24 24\\'><rect x=3 y=3 width=18 height=18 rx=2 fill=none stroke=currentColor stroke-width=1.5/><circle cx=8.5 cy=8.5 r=1.5 fill=currentColor/><path d=\\'M21 15l-5-5L5 21\\' stroke=currentColor stroke-width=1.5 fill=none/></svg></div>'">`
+      : `<div class="thumb-ph"><svg width="18" height="18" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.5" fill="none"/></svg></div>`;
+    const appliedBadge = applied ? `<span class="applied-badge">✓ verwerkt</span>` : '';
+
+    return `<tr${applied ? ' class="applied-row"' : ''}>
+      <td>${imgThumb}</td>
+      <td>
+        <div class="product-title">${esc(item.product_title)} ${appliedBadge}</div>
+        <a class="product-url" href="${esc(item.product_url)}" target="_blank">${esc(item.product_url)}</a>
+        <div class="img-index">Afbeelding ${item.image_index + 1} van product</div>
+      </td>
+      <td>
+        <div class="alt-wrap">
+          <input class="alt-input" type="text" value="${esc(altVal)}"
+            data-orig-idx="${origIdx}"
+            oninput="onAltChange(this)"
+            maxlength="150"
+            ${applied ? 'disabled' : ''}>
+          <div class="alt-meta">
+            <span class="char-count ${charClass(charN)}" id="cc-${origIdx}">${charN}/125 tekens</span>
+            ${!applied ? `<button class="reset-btn" onclick="resetAlt(${origIdx})">Herstel suggestie</button>` : ''}
+          </div>
+        </div>
+      </td>
+      <td style="text-align:center">${applied
+        ? `<span style="color:#16a34a;font-size:16px">✓</span>`
+        : `<input type="checkbox" class="cb" ${checked ? 'checked' : ''} onchange="toggleAlt(${origIdx}, this.checked)">`}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('alt-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
+  document.getElementById('alt-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
+  document.getElementById('alt-prev').disabled = page === 0;
+  document.getElementById('alt-next').disabled = page >= pages - 1;
+  updateProgressRing();
+}
+
+function onAltChange(input) {
+  const origIdx = parseInt(input.dataset.origIdx);
+  data.missing_alt[origIdx].suggested_alt = input.value;
+  const n = input.value.length;
+  const cc = document.getElementById('cc-' + origIdx);
+  if (cc) { cc.textContent = n + '/125 tekens'; cc.className = 'char-count ' + charClass(n); }
+}
+
+function resetAlt(origIdx) {
+  const item = data.missing_alt[origIdx];
+  const suggested = buildSuggestion(item.product_title, item.image_index);
+  item.suggested_alt = suggested;
+  renderAlt();
+}
+
+function buildSuggestion(title, idx) {
+  const suffix = ' | Cádomotus';
+  const base   = idx === 0 ? title : `${title} – detail ${idx}`;
+  const full   = base + suffix;
+  if (full.length <= 125) return full;
+  return base.slice(0, 125 - suffix.length) + suffix;
+}
+
+function toggleAlt(origIdx, checked) {
+  if (checked) state.alt.selected.add(origIdx);
+  else state.alt.selected.delete(origIdx);
+  updateApplyBar();
+}
+
+// ── Render: Dead links ───────────────────────────────────────
+function renderDead() {
+  const items  = data.dead_links;
+  const page   = state.dead.page;
+  const start  = page * PER_PAGE;
+  const slice  = items.slice(start, start + PER_PAGE);
+  const tbody  = document.getElementById('dead-tbody');
+  const total  = items.length;
+  const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">Geen dode links gevonden</div>
+      <div class="empty-sub">Alle interne links op cadomotus.com zijn bereikbaar.</div>
+    </div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(item => {
+      const st = item.http_status;
+      const badgeClass = st === 410 ? 'badge-410' : 'badge-404';
+      return `<tr>
+        <td class="link-cell">
+          <a href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
+          ${item.anchor_text ? `<div class="anchor-text">"${esc(item.anchor_text)}"</div>` : ''}
+        </td>
+        <td><div class="found-on">${esc(item.found_on_page)}</div></td>
+        <td><span class="badge ${badgeClass}">${st || '?'}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('dead-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
+  document.getElementById('dead-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
+  document.getElementById('dead-prev').disabled = page === 0;
+  document.getElementById('dead-next').disabled = page >= pages - 1;
+}
+
+// ── Render: Redirects ────────────────────────────────────────
+function renderRedirect() {
+  const items  = data.redirect_links;
+  const page   = state.redirect.page;
+  const start  = page * PER_PAGE;
+  const slice  = items.slice(start, start + PER_PAGE);
+  const tbody  = document.getElementById('redirect-tbody');
+  const total  = items.length;
+  const pages  = Math.max(1, Math.ceil(total / PER_PAGE));
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">Geen redirect-ketens gevonden</div>
+      <div class="empty-sub">Alle links op cadomotus.com wijzen direct naar het einddoel.</div>
+    </div></td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(item => {
+      const st = item.http_status;
+      const badgeClass = st === 301 ? 'badge-301' : 'badge-302';
+      return `<tr>
+        <td class="link-cell">
+          <a href="${esc(item.link_url)}" target="_blank">${esc(item.link_url)}</a>
+          ${item.anchor_text ? `<div class="anchor-text">"${esc(item.anchor_text)}"</div>` : ''}
+        </td>
+        <td><div class="found-on">${esc(item.found_on_page)}</div></td>
+        <td class="redirect-dest"><a href="${esc(item.redirects_to)}" target="_blank">${esc(item.redirects_to)}</a></td>
+        <td><span class="badge ${badgeClass}">${st}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('redirect-page-num').textContent = `Pagina ${page + 1} van ${pages}`;
+  document.getElementById('redirect-page-info').textContent = `${total} item${total !== 1 ? 's' : ''}`;
+  document.getElementById('redirect-prev').disabled = page === 0;
+  document.getElementById('redirect-next').disabled = page >= pages - 1;
+}
+
+function renderTab(tab) {
+  if (tab === 'alt') renderAlt();
+  else if (tab === 'dead') renderDead();
+  else renderRedirect();
+}
+
+// ── Progress ring ────────────────────────────────────────────
+function updateProgressRing() {
+  const total   = data.missing_alt.length;
+  if (!total) return;
+  const applied = data.missing_alt.filter(i => i.status === 'applied').length;
+  const pct     = Math.round((applied / total) * 100);
+  document.getElementById('s-applied').textContent = applied;
+  document.getElementById('progress-pct').textContent = pct + '%';
+  if (applied > 0) document.getElementById('progress-wrap').style.display = 'flex';
+}
+
+// ── Pagination ───────────────────────────────────────────────
+function prevPage(tab) {
+  if (tab === 'alt' && state.alt.page > 0) { state.alt.page--; renderAlt(); }
+  else if (tab === 'dead' && state.dead.page > 0) { state.dead.page--; renderDead(); }
+  else if (tab === 'redirect' && state.redirect.page > 0) { state.redirect.page--; renderRedirect(); }
+}
+function nextPage(tab) {
+  if (tab === 'alt') {
+    const max = Math.ceil(filteredAlt.length / PER_PAGE) - 1;
+    if (state.alt.page < max) { state.alt.page++; renderAlt(); }
+  } else if (tab === 'dead') {
+    const max = Math.ceil(data.dead_links.length / PER_PAGE) - 1;
+    if (state.dead.page < max) { state.dead.page++; renderDead(); }
+  } else {
+    const max = Math.ceil(data.redirect_links.length / PER_PAGE) - 1;
+    if (state.redirect.page < max) { state.redirect.page++; renderRedirect(); }
+  }
+}
+
+// ── CSV / Copy ───────────────────────────────────────────────
+function downloadCSV(tab) {
+  const items = tab === 'dead' ? data.dead_links : data.redirect_links;
+  if (!items.length) { toast('Geen data om te exporteren.'); return; }
+
+  let csv = tab === 'dead'
+    ? 'URL,Gevonden op pagina,HTTP status\n'
+    : 'URL,Gevonden op pagina,Stuurt door naar,HTTP status\n';
+
+  items.forEach(item => {
+    if (tab === 'dead') {
+      csv += `"${item.link_url}","${item.found_on_page}",${item.http_status}\n`;
+    } else {
+      csv += `"${item.link_url}","${item.found_on_page}","${item.redirects_to}",${item.http_status}\n`;
+    }
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `cadomotus_${tab === 'dead' ? 'dode_links' : 'redirects'}.csv`
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`CSV gedownload (${items.length} items).`, 'success');
+}
+
+function copyAllURLs(tab) {
+  const items = tab === 'dead' ? data.dead_links : data.redirect_links;
+  if (!items.length) { toast('Geen URLs om te kopiëren.'); return; }
+  const text = items.map(i => i.link_url).join('\n');
+  navigator.clipboard.writeText(text).then(
+    () => toast(`${items.length} URLs gekopieerd.`, 'success'),
+    () => toast('Kopiëren mislukt — probeer handmatig.', 'error')
+  );
+}
+
+// ── Tabs ─────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+    el.classList.add('active');
+    activeTab = el.dataset.tab;
+    document.getElementById('tab-' + activeTab).style.display = 'block';
+  });
+});
+
+// ── Apply fixes (batched) ────────────────────────────────────
+async function applyFixes() {
+  const selectedIndices = [...state.alt.selected];
+  if (!selectedIndices.length) {
+    toast('Selecteer eerst minimaal één alt-tag om te verwerken.', '');
+    return;
+  }
+
+  const btn = document.getElementById('apply-btn');
+  const progressWrap = document.getElementById('apply-progress-wrap');
+  const progressLabel = document.getElementById('apply-progress-label');
+  const fill = document.getElementById('apply-fill');
+
+  btn.disabled = true;
+  btn.textContent = 'Bezig...';
+  progressWrap.style.display = 'flex';
+
+  const total = selectedIndices.length;
+  let applied = 0;
+  let errors  = [];
+
+  // Chunk into batches
+  const chunks = [];
+  for (let i = 0; i < selectedIndices.length; i += BATCH_SIZE) {
+    chunks.push(selectedIndices.slice(i, i + BATCH_SIZE));
+  }
+
+  for (let ci = 0; ci < chunks.length; ci++) {
+    const chunk = chunks[ci];
+    const items = chunk.map(origIdx => ({
+      ...data.missing_alt[origIdx],
+      alt_text: data.missing_alt[origIdx].suggested_alt,
+    }));
+
+    const pct = Math.round((applied / total) * 100);
+    progressLabel.textContent = `Verwerkt ${applied} van ${total} alt-tags...`;
+    fill.style.width = pct + '%';
+
+    try {
+      const resp = await fetch('/review/apply?token=' + encodeURIComponent(TOKEN), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selected_alts: items }),
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || 'Server error ' + resp.status);
+
+      applied += result.applied || 0;
+      if (result.errors) errors.push(...result.errors);
+
+      // Mark applied
+      chunk.forEach(origIdx => {
+        if (!result.errors?.find(e => e.image_id === data.missing_alt[origIdx].image_id)) {
+          data.missing_alt[origIdx].status = 'applied';
+        }
+      });
+    } catch (err) {
+      errors.push({ error: err.message });
+    }
+  }
+
+  // Final state
+  fill.style.width = '100%';
+  progressLabel.textContent = `Klaar — ${applied} van ${total} verwerkt.`;
+  appliedCount += applied;
+  state.alt.selected.clear();
+  rebuildFilteredAlt();
+  renderAlt();
+  updateApplyBar();
+  updateProgressRing();
+
+  toast(
+    `${applied} alt-tags bijgewerkt in Shopify!${errors.length ? ` (${errors.length} fouten — zie console)` : ''}`,
+    errors.length ? 'info' : 'success'
+  );
+  if (errors.length) console.warn('Apply fouten:', errors);
+
+  setTimeout(() => {
+    progressWrap.style.display = 'none';
+    fill.style.width = '0';
+    progressLabel.textContent = 'Verwerken...';
+    btn.disabled = false;
+    btn.textContent = 'Goedkeuren & uitvoeren →';
+  }, 3000);
+}
+
+// ── Rescan ───────────────────────────────────────────────────
+function openRescanModal() {
+  document.getElementById('rescan-overlay').classList.add('open');
+  document.getElementById('rescan-status').style.display = 'none';
+  document.getElementById('rescan-confirm').style.display = '';
+  document.getElementById('rescan-cancel').textContent = 'Annuleren';
+}
+
+function closeRescanModal(e) {
+  if (!e || e.target === document.getElementById('rescan-overlay')) {
+    document.getElementById('rescan-overlay').classList.remove('open');
+  }
+}
+
+async function startRescan() {
+  const statusEl  = document.getElementById('rescan-status');
+  const confirmEl = document.getElementById('rescan-confirm');
+  const cancelEl  = document.getElementById('rescan-cancel');
+
+  confirmEl.style.display = 'none';
+  statusEl.style.display  = 'block';
+  statusEl.textContent    = 'Scan wordt gestart...';
+
+  try {
+    const resp = await fetch('/review/audit?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 409) {
+      statusEl.textContent = 'Er loopt al een scan. Wacht tot die klaar is.';
+      return;
+    }
+    if (!resp.ok) throw new Error('Status ' + resp.status);
+
+    statusEl.textContent = 'Scan gestart. Dit duurt ~15-20 min. Je kunt dit venster sluiten.';
+    cancelEl.textContent = 'Sluiten';
+    document.getElementById('rescan-btn').disabled = true;
+
+    // Poll status
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch('/review/status');
+        const sd = await sr.json();
+        if (sd.status === 'done') {
+          clearInterval(poll);
+          statusEl.textContent = `Klaar! Pagina wordt herladen...`;
+          setTimeout(() => location.reload(), 1500);
+        } else if (sd.status === 'running') {
+          const phase = sd.phase === 'images' ? 'Shopify images ophalen...'
+                      : sd.phase === 'crawling_pages' ? `Pagina's crawlen (${sd.pages_crawled || 0}/${sd.total || '?'})...`
+                      : sd.phase === 'checking_links' ? 'Links controleren...'
+                      : 'Bezig...';
+          statusEl.textContent = phase;
+        } else if (sd.status === 'error') {
+          clearInterval(poll);
+          statusEl.textContent = 'Scan mislukt: ' + (sd.error || 'onbekende fout');
+        }
+      } catch (_) {}
+    }, 8000);
+  } catch (err) {
+    statusEl.textContent = 'Fout bij starten: ' + err.message;
+    confirmEl.style.display = '';
+  }
+}
+
+// ── Load data ────────────────────────────────────────────────
+async function loadData() {
+  if (!TOKEN) {
+    document.getElementById('loading').innerHTML =
+      '<div style="color:#dc2626;font-size:15px;text-align:center;padding:40px">Geen toegangstoken in de URL. Gebruik de link die je van The System hebt ontvangen.</div>';
+    return;
+  }
+
+  try {
+    const resp = await fetch('/review/data?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 401) throw new Error('Ongeldige toegangstoken.');
+    if (resp.status === 404) throw new Error('Audit-data nog niet beschikbaar. Start eerst een scan via "Nieuwe scan starten".');
+    if (!resp.ok) throw new Error('Server error ' + resp.status);
+
+    data = await resp.json();
+
+    // Header
+    const d = data.crawled_at ? new Date(data.crawled_at) : null;
+    document.getElementById('crawl-date').textContent = d
+      ? 'Scan van ' + d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+      : '';
+
+    // Summary numbers
+    const s = data.summary || {};
+    const altTotal  = s.missing_alt_count  ?? data.missing_alt.length;
+    const deadTotal = s.dead_links_count   ?? data.dead_links.length;
+    const redirTotal = s.redirect_count    ?? data.redirect_links.length;
+
+    document.getElementById('s-alt').textContent      = altTotal;
+    document.getElementById('s-dead').textContent     = deadTotal;
+    document.getElementById('s-redirect').textContent = redirTotal;
+
+    // Tab badges
+    document.getElementById('tab-alt-count').textContent      = altTotal;
+    document.getElementById('tab-dead-count').textContent     = deadTotal;
+    document.getElementById('tab-redirect-count').textContent = redirTotal;
+
+    // Applied count
+    appliedCount = data.missing_alt.filter(i => i.status === 'applied').length;
+    document.getElementById('s-applied').textContent = appliedCount;
+    if (appliedCount > 0) document.getElementById('progress-wrap').style.display = 'flex';
+    updateProgressRing();
+
+    // Build filter & render
+    rebuildFilteredAlt();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('tab-alt').style.display = 'block';
+    renderAlt();
+
+    // Auto-select all pending
+    data.missing_alt.forEach((item, origIdx) => {
+      if (item.status !== 'applied') state.alt.selected.add(origIdx);
+    });
+    updateApplyBar();
+
+  } catch (err) {
+    document.getElementById('loading').innerHTML =
+      `<div style="color:#dc2626;font-size:15px;text-align:center;padding:40px">${esc(String(err.message))}</div>`;
+  }
+}
+
+// ── Full audit ───────────────────────────────────────────────
+let fullData = { issues: [], total_issues: 0, crawled_at: null };
+let fullFiltered = [];
+let fullPage = 0;
+const FULL_PER_PAGE = 50;
+
+async function loadFullAudit() {
+  const notLoaded = document.getElementById('full-not-loaded');
+  const loaded    = document.getElementById('full-loaded');
+  const msg       = document.getElementById('full-scan-msg');
+  const startBtn  = document.getElementById('full-start-btn');
+
+  notLoaded.style.display = 'block';
+  loaded.style.display    = 'none';
+  msg.textContent = 'Controleren of audit beschikbaar is...';
+
+  try {
+    const resp = await fetch('/full/data?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 404) {
+      msg.textContent = 'Nog geen volledige audit beschikbaar.';
+      startBtn.style.display = 'inline-block';
+      return;
+    }
+    if (resp.status === 401) { msg.textContent = 'Geen toegang.'; return; }
+    if (!resp.ok) throw new Error('Status ' + resp.status);
+
+    fullData = await resp.json();
+    renderFullAudit();
+    notLoaded.style.display = 'none';
+    loaded.style.display    = 'block';
+
+    const d = fullData.crawled_at ? new Date(fullData.crawled_at) : null;
+    if (d) document.getElementById('full-rescan-btn').title =
+      'Laatste scan: ' + d.toLocaleDateString('nl-NL');
+
+  } catch (err) {
+    msg.textContent = 'Fout: ' + err.message;
+    startBtn.style.display = 'inline-block';
+  }
+}
+
+function renderFullAudit() {
+  // Stats
+  const s = fullData;
+  const by_sev = s.summary_by_severity || {};
+  document.getElementById('full-stats').innerHTML = `
+    <span class="full-stat-chip chip-total">${s.total_issues || 0} issues totaal</span>
+    <span class="full-stat-chip chip-high">${by_sev.high || 0} hoog</span>
+    <span class="full-stat-chip chip-medium">${by_sev.medium || 0} medium</span>
+    <span class="full-stat-chip chip-low">${by_sev.low || 0} laag</span>
+    <span class="full-stat-chip chip-total">${s.pages_crawled || 0} pagina's gecrawled</span>`;
+
+  // Populate type filter
+  const types = [...new Set((fullData.issues || []).map(i => i.type))].sort();
+  const typeFilter = document.getElementById('full-type-filter');
+  typeFilter.innerHTML = '<option value="">Alle types</option>' +
+    types.map(t => `<option value="${esc(t)}">${esc(t.replace(/_/g,' '))}</option>`).join('');
+
+  document.getElementById('tab-full-count').textContent = s.total_issues || '—';
+  fullFilterChange();
+}
+
+function fullFilterChange() {
+  const q       = (document.getElementById('full-search')?.value || '').toLowerCase().trim();
+  const sev     = document.getElementById('full-sev-filter')?.value || '';
+  const type    = document.getElementById('full-type-filter')?.value || '';
+  const lang    = document.getElementById('full-lang-filter')?.value || '';
+  const pgType  = document.getElementById('full-pagetype-filter')?.value || '';
+
+  fullFiltered = (fullData.issues || []).filter(issue => {
+    if (sev    && issue.severity   !== sev)    return false;
+    if (type   && issue.type       !== type)   return false;
+    if (lang   && issue.lang       !== lang)   return false;
+    if (pgType && issue.page_type  !== pgType) return false;
+    if (q) {
+      const hay = ((issue.url || '') + (issue.label || '') + (issue.type || '') +
+                   (issue.current_value || '') + (issue.shopify_title || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  fullPage = 0;
+  renderFullTable();
+}
+
+function renderFullTable() {
+  const start = fullPage * FULL_PER_PAGE;
+  const slice = fullFiltered.slice(start, start + FULL_PER_PAGE);
+  const total = fullFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / FULL_PER_PAGE));
+  const tbody = document.getElementById('full-tbody');
+
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Geen resultaten</div>
+      <div class="empty-sub">Pas de filters aan.</div>
+    </div></td></tr>`;
+    document.getElementById('full-page-num').textContent = 'Pagina 1 van 1';
+    document.getElementById('full-page-info').textContent = '0 issues';
+    document.getElementById('full-prev').disabled = true;
+    document.getElementById('full-next').disabled = true;
+    return;
+  }
+
+  tbody.innerHTML = slice.map(issue => {
+    const sev = issue.severity || 'low';
+    const urlShort = (issue.url || '').replace('https://cadomotus.com', '');
+    const val = issue.current_value || '';
+    const pgTitle = issue.shopify_title ? `<div style="font-size:11px;color:#52525b;margin-top:1px">${esc(issue.shopify_title)}</div>` : '';
+    return `<tr>
+      <td><span class="badge badge-${sev}">${sev}</span></td>
+      <td>
+        <div style="font-size:12px;font-weight:500;color:#18181b">${esc(issue.label || issue.type)}</div>
+        ${val ? `<div class="issue-value" title="${esc(val)}">${esc(val)}</div>` : ''}
+      </td>
+      <td>
+        <a class="issue-url" href="${esc(issue.url || '')}" target="_blank">${esc(urlShort || issue.url || '')}</a>
+        ${pgTitle}
+      </td>
+      <td><span class="lang-chip">${esc(issue.lang || 'en')}</span></td>
+      <td><span style="font-size:11px;color:#71717a">${esc(issue.page_type || '')}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('full-page-num').textContent = `Pagina ${fullPage + 1} van ${pages}`;
+  document.getElementById('full-page-info').textContent = `${total} issues`;
+  document.getElementById('full-prev').disabled = fullPage === 0;
+  document.getElementById('full-next').disabled = fullPage >= pages - 1;
+}
+
+function fullPrevPage() { if (fullPage > 0) { fullPage--; renderFullTable(); } }
+function fullNextPage() {
+  const max = Math.ceil(fullFiltered.length / FULL_PER_PAGE) - 1;
+  if (fullPage < max) { fullPage++; renderFullTable(); }
+}
+
+function downloadFullCSV() {
+  if (!fullFiltered.length) { toast('Geen data om te exporteren.'); return; }
+  let csv = 'Ernst,Type,Issue,URL,Taal,Pagina type,Huidige waarde,Shopify handle\n';
+  fullFiltered.forEach(i => {
+    csv += [i.severity, i.type, i.label, i.url, i.lang, i.page_type,
+            (i.current_value||'').replace(/"/g,"'"), i.shopify_handle||'']
+      .map(v => `"${(v||'').replace(/"/g,"'")}"`)
+      .join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `cadomotus_full_seo_audit.csv`
+  });
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast(`CSV gedownload (${fullFiltered.length} issues).`, 'success');
+}
+
+async function triggerFullAudit() {
+  const btn = document.getElementById('full-start-btn') || document.getElementById('full-rescan-btn');
+  const msg = document.getElementById('full-scan-msg');
+  if (btn) btn.disabled = true;
+
+  document.getElementById('full-not-loaded').style.display = 'block';
+  document.getElementById('full-loaded').style.display = 'none';
+  if (msg) msg.textContent = 'Audit starten...';
+
+  try {
+    const resp = await fetch('/full/audit?token=' + encodeURIComponent(TOKEN));
+    if (resp.status === 409) {
+      if (msg) msg.textContent = 'Audit loopt al. Even wachten...';
+    } else if (!resp.ok) {
+      throw new Error('Status ' + resp.status);
+    } else {
+      if (msg) msg.textContent = 'Audit gestart — dit duurt 30-45 minuten. Polling...';
+    }
+
+    const poll = setInterval(async () => {
+      try {
+        const sr = await fetch('/full/status');
+        const sd = await sr.json();
+        if (sd.status === 'done') {
+          clearInterval(poll);
+          if (msg) msg.textContent = 'Klaar! Resultaten laden...';
+          await loadFullAudit();
+        } else if (sd.status === 'running') {
+          const phaseMap = {
+            shopify_products: 'Shopify products checken...',
+            shopify_collections: 'Shopify collecties checken...',
+            sitemap: 'Sitemap-URLs ophalen...',
+            html_crawl: `Pagina's crawlen (${sd.pages_crawled||0}/${sd.total||'?'}) — ${sd.issues_found||0} issues gevonden...`,
+          };
+          if (msg) msg.textContent = phaseMap[sd.phase] || 'Bezig...';
+        } else if (sd.status === 'error') {
+          clearInterval(poll);
+          if (msg) msg.textContent = 'Fout: ' + (sd.error || 'onbekend');
+          if (btn) btn.disabled = false;
+        }
+      } catch (_) {}
+    }, 10000);
+  } catch (err) {
+    if (msg) msg.textContent = 'Fout bij starten: ' + err.message;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Auto-laad full audit als de tab geselecteerd wordt
+const _origTabHandler = document.querySelectorAll.bind(document);
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.dataset.tab === 'full' && !fullData.total_issues) {
+        loadFullAudit();
+      }
+    });
+  });
+});
+
+loadData();
+</script>
+</body>
+</html>
